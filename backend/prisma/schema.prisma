@@ -15,4 +15,52 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  categories Category[]
+  coupons    Coupon[]
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  tenantId    Int
+  name        String
+  slug        String
+  description String?
+  parentId    Int?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model Coupon {
+  id            Int          @id @default(autoincrement())
+  tenantId      Int
+  code          String
+  description   String?
+  discountType  DiscountType
+  discountValue Decimal      @db.Decimal(10, 2)
+  expiresAt     DateTime
+  usageLimit    Int
+  usedCount     Int          @default(0)
+  minimumOrder  Decimal?     @db.Decimal(10, 2)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, expiresAt])
 }
