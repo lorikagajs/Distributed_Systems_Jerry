@@ -13,7 +13,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(query: QueryProductsDto) {
+  async findAll(query: QueryProductsDto, tenantId: number) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const search = query.search?.trim();
@@ -21,7 +21,7 @@ export class ProductsService {
     const sortOrder = query.sortOrder ?? 'desc';
 
     const where: Prisma.ProductWhereInput = {
-      tenantId: query.tenantId,
+      tenantId,
       ...(search
         ? {
             name: {
@@ -69,9 +69,9 @@ export class ProductsService {
     return product;
   }
 
-  async create(data: CreateProductDto) {
+  async create(data: CreateProductDto, tenantId: number) {
     const createData: Prisma.ProductUncheckedCreateInput = {
-      tenantId: data.tenantId,
+      tenantId,
       name: data.name,
       description: data.description,
       price: data.price,

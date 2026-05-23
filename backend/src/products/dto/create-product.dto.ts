@@ -12,12 +12,6 @@ import {
 } from 'class-validator';
 
 export class CreateProductDto {
-  @ApiProperty({ example: 1 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  tenantId!: number;
-
   @ApiProperty({ example: 'Classic Hoodie' })
   @IsString()
   @IsNotEmpty()

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -22,12 +22,6 @@ export type ProductSortField = (typeof PRODUCT_SORT_FIELDS)[number];
 export type SortOrder = 'asc' | 'desc';
 
 export class QueryProductsDto {
-  @ApiProperty({ example: 1 })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  tenantId!: number;
-
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
