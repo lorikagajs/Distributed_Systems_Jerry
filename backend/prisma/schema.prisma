@@ -7,6 +7,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  CASH_ON_DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum ShippingStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
 model Tenant {
   id        Int      @id @default(autoincrement())
   name      String
@@ -15,4 +60,302 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  users          User[]
+  products       Product[]
+  categories     Category[]
+  orders         Order[]
+  reviews        Review[]
+  coupons        Coupon[]
+  auditLogs      AuditLog[]
+  tenantSettings TenantSettings?
+  carts          Cart[]
+  wishlists      Wishlist[]
+  tags           Tag[]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String
+  password  String
+  role      UserRole @default(CUSTOMER)
+  tenantId  Int
+  createdAt DateTime @default(now())
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  cart          Cart?
+  addresses     Address[]
+  reviews       Review[]
+  notifications Notification[]
+  wishlists     Wishlist[]
+  auditLogs     AuditLog[]     @relation("AuditLogPerformer")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, role])
+}
+
+model Category {
+  id       Int    @id @default(autoincrement())
+  name     String
+  tenantId Int
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  stock       Int     @default(0)
+  categoryId  Int
+  tenantId    Int
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category      Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  productTags   ProductTag[]
+
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
+  @@index([categoryId])
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  tenantId    Int
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+  payments Payment[]
+  shipping Shipping?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, userId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Cart {
+  id       Int @id @default(autoincrement())
+  userId   Int @unique
+  tenantId Int
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  CartItem[]
+
+  @@index([tenantId])
+}
+
+model CartItem {
+  id        Int @id @default(autoincrement())
+  cartId    Int
+  productId Int
+  quantity  Int @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+model Address {
+  id      Int    @id @default(autoincrement())
+  userId  Int
+  street  String
+  city    String
+  country String
+  zipCode String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Payment {
+  id        Int           @id @default(autoincrement())
+  orderId   Int
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  amount    Decimal       @db.Decimal(10, 2)
+  createdAt DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderId, status])
+  @@index([createdAt])
+}
+
+model Review {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  productId Int
+  rating    Int
+  comment   String?
+  tenantId  Int
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([tenantId])
+  @@index([tenantId, productId])
+  @@index([productId])
+  @@index([userId])
+}
+
+model Coupon {
+  id        Int       @id @default(autoincrement())
+  code      String
+  discount  Decimal   @db.Decimal(10, 2)
+  tenantId  Int
+  expiresAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  action      String
+  entity      String
+  entityId    Int
+  performedBy Int?
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  performer User?  @relation("AuditLogPerformer", fields: [performedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt])
+  @@index([performedBy])
+}
+
+model TenantSettings {
+  id           Int    @id @default(autoincrement())
+  tenantId     Int    @unique
+  logoUrl      String?
+  primaryColor String?
+  currency     String  @default("USD")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Shipping {
+  id             Int            @id @default(autoincrement())
+  orderId        Int            @unique
+  carrier        String
+  trackingNumber String?
+  status         ShippingStatus @default(PENDING)
+  estimatedAt    DateTime?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([trackingNumber])
+}
+
+model Wishlist {
+  id       Int @id @default(autoincrement())
+  userId   Int
+  tenantId Int
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  WishlistItem[]
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model WishlistItem {
+  id         Int @id @default(autoincrement())
+  wishlistId Int
+  productId  Int
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, productId])
+  @@index([wishlistId])
+  @@index([productId])
+}
+
+model Tag {
+  id       Int    @id @default(autoincrement())
+  name     String
+  tenantId Int
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productTags ProductTag[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model ProductTag {
+  id        Int @id @default(autoincrement())
+  productId Int
+  tagId     Int
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, tagId])
+  @@index([productId])
+  @@index([tagId])
 }
