@@ -8,11 +8,30 @@ datasource db {
 }
 
 model Tenant {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
-  slug      String   @unique
+  slug      String    @unique
   email     String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  sku         String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([tenantId, name])
 }
