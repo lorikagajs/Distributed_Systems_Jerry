@@ -1,16 +1,20 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { Category } from '@prisma/client';
+import { BaseService } from '../common/base/base.service';
+import { TenantScopedCrudService } from '../common/interfaces/crud-service.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
-export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+export class CategoriesService
+  extends BaseService<Category>
+  implements
+    TenantScopedCrudService<Category, CreateCategoryDto, UpdateCategoryDto>
+{
+  constructor(private readonly prisma: PrismaService) {
+    super('Category');
+  }
 
   findAll(tenantId: number) {
     return this.prisma.category.findMany({
@@ -23,10 +27,8 @@ export class CategoriesService {
     const category = await this.prisma.category.findFirst({
       where: { id, tenantId },
     });
-    if (!category) {
-      throw new NotFoundException(`Category with id ${id} not found`);
-    }
-    return category;
+
+    return this.ensureEntityFound(category, id);
   }
 
   async create(tenantId: number, dto: CreateCategoryDto) {
@@ -35,13 +37,10 @@ export class CategoriesService {
         data: { name: dto.name, tenantId },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Category name already exists for this tenant');
-      }
-      throw error;
+      this.handleUniqueConstraint(
+        error,
+        'Category name already exists for this tenant',
+      );
     }
   }
 
@@ -53,13 +52,10 @@ export class CategoriesService {
         data: dto,
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Category name already exists for this tenant');
-      }
-      throw error;
+      this.handleUniqueConstraint(
+        error,
+        'Category name already exists for this tenant',
+      );
     }
   }
 

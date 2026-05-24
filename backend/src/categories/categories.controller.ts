@@ -24,6 +24,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/types/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { BaseController } from '../common/base/base.controller';
 import { TenantQueryDto } from '../common/dto/tenant-query.dto';
 import { resolveTenantId } from '../common/utils/resolve-tenant-id';
 import { CategoriesService } from './categories.service';
@@ -32,15 +33,17 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('Categories')
 @Controller('categories')
-export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+export class CategoriesController extends BaseController<CategoriesService> {
+  constructor(categoriesService: CategoriesService) {
+    super(categoriesService);
+  }
 
   @Public()
   @Get()
   @ApiOperation({ summary: 'List all categories for a tenant' })
   findAll(@Query() query: TenantQueryDto, @Req() req: Request) {
     const tenantId = resolveTenantId(req.tenant, query.tenantId);
-    return this.categoriesService.findAll(tenantId);
+    return this.service.findAll(tenantId);
   }
 
   @Public()
@@ -53,7 +56,7 @@ export class CategoriesController {
     @Req() req: Request,
   ) {
     const tenantId = resolveTenantId(req.tenant, query.tenantId);
-    return this.categoriesService.findOne(tenantId, id);
+    return this.service.findOne(tenantId, id);
   }
 
   @ApiBearerAuth()
@@ -62,7 +65,7 @@ export class CategoriesController {
   @Post()
   @ApiOperation({ summary: 'Create a category (admin only)' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create(user.tenantId, dto);
+    return this.service.create(this.tenantIdFrom(user), dto);
   }
 
   @ApiBearerAuth()
@@ -76,7 +79,7 @@ export class CategoriesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCategoryDto,
   ) {
-    return this.categoriesService.update(user.tenantId, id, dto);
+    return this.service.update(this.tenantIdFrom(user), id, dto);
   }
 
   @ApiBearerAuth()
@@ -85,10 +88,7 @@ export class CategoriesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a category (admin only)' })
   @ApiParam({ name: 'id', type: Number })
-  remove(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.categoriesService.remove(user.tenantId, id);
+  remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(this.tenantIdFrom(user), id);
   }
 }

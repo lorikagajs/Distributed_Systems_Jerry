@@ -1,18 +1,24 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Coupon, Prisma } from '@prisma/client';
+import { BaseService } from '../common/base/base.service';
+import { TenantScopedCrudService } from '../common/interfaces/crud-service.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApplyCouponDto } from './dto/apply-coupon.dto';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 
 @Injectable()
-export class CouponsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class CouponsService
+  extends BaseService<Coupon>
+  implements TenantScopedCrudService<Coupon, CreateCouponDto, UpdateCouponDto>
+{
+  constructor(private readonly prisma: PrismaService) {
+    super('Coupon');
+  }
 
   findAll(tenantId: number) {
     return this.prisma.coupon.findMany({
@@ -25,10 +31,8 @@ export class CouponsService {
     const coupon = await this.prisma.coupon.findFirst({
       where: { id, tenantId },
     });
-    if (!coupon) {
-      throw new NotFoundException(`Coupon with id ${id} not found`);
-    }
-    return coupon;
+
+    return this.ensureEntityFound(coupon, id);
   }
 
   async create(tenantId: number, dto: CreateCouponDto) {
@@ -42,13 +46,10 @@ export class CouponsService {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Coupon code already exists for this tenant');
-      }
-      throw error;
+      this.handleUniqueConstraint(
+        error,
+        'Coupon code already exists for this tenant',
+      );
     }
   }
 
@@ -69,13 +70,10 @@ export class CouponsService {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Coupon code already exists for this tenant');
-      }
-      throw error;
+      this.handleUniqueConstraint(
+        error,
+        'Coupon code already exists for this tenant',
+      );
     }
   }
 

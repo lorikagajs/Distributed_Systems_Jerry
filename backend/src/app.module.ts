@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { AppController } from './app.controller';
@@ -44,6 +45,6 @@ import { UsersModule } from './users/users.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*');
+    consumer.apply(LoggingMiddleware, TenantMiddleware).forRoutes('*');
   }
 }
