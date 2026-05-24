@@ -1,28 +1,33 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TenantsService } from './tenants.service';
+import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-describe('TenantsService', () => {
-  let service: TenantsService;
+describe('UsersService', () => {
+  let service: UsersService;
+  let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        TenantsService,
+        UsersService,
         {
           provide: PrismaService,
           useValue: {
-            tenant: {
-              findMany: jest.fn(),
+            user: {
               findUnique: jest.fn(),
+              findMany: jest.fn(),
               findFirst: jest.fn(),
+              create: jest.fn(),
+              update: jest.fn(),
+              delete: jest.fn(),
             },
           },
         },
       ],
     }).compile();
 
-    service = module.get<TenantsService>(TenantsService);
+    service = module.get<UsersService>(UsersService);
+    prisma = module.get<PrismaService>(PrismaService);
   });
 
   it('should be defined', () => {

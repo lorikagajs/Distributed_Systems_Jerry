@@ -17,6 +17,7 @@ import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     PrismaModule,
     TenantsModule,
     AuthModule,
+    UsersModule,
     CategoriesModule,
     ProductsModule,
     OrdersModule,

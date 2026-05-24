@@ -12,6 +12,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './types/jwt-payload.interface';
 
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+
 const BCRYPT_ROUNDS = 10;
 
 @Injectable()
@@ -79,7 +81,51 @@ export class AuthService {
 
     return {
       access_token: this.signToken(authenticatedUser),
+      refresh_token: this.signRefreshToken(authenticatedUser),
     };
+  }
+
+  async refresh(dto: RefreshTokenDto) {
+    try {
+      const payload = this.jwtService.verify(dto.refreshToken, {
+        secret: process.env.JWT_SECRET,
+      });
+
+      if (!payload.sub || payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      return {
+        access_token: this.signToken(user),
+        refresh_token: this.signRefreshToken(user),
+      };
+    } catch (e) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
+  async me(userId: number, tenantId: number) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+      },
+      select: this.userSelect(),
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 
   private signToken(user: User): string {
@@ -91,7 +137,22 @@ export class AuthService {
       tenantId: user.tenantId,
     };
 
-    return this.jwtService.sign(payload);
+    return this.jwtService.sign(payload, {
+      expiresIn: (process.env.JWT_EXPIRATION || '1h') as any,
+    });
+  }
+
+  private signRefreshToken(user: User): string {
+    const payload = {
+      sub: user.id,
+      userId: user.id,
+      tenantId: user.tenantId,
+      type: 'refresh',
+    };
+
+    return this.jwtService.sign(payload, {
+      expiresIn: (process.env.JWT_REFRESH_EXPIRATION || '7d') as any,
+    });
   }
 
   private userSelect() {
