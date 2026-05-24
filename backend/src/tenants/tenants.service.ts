@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 
 const publicConfigSelect = {
+  id: true,
   slug: true,
   storeName: true,
   logoUrl: true,
