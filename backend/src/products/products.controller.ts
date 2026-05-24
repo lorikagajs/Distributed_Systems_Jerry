@@ -13,6 +13,11 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import {
+  CacheInterceptor,
+  CacheKey,
+  CacheTTL,
+} from '@nestjs/cache-manager';
 import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -34,6 +39,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { PublicProductQueryDto } from './dto/public-product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
+import { buildProductsListCacheKey } from './products-cache.constants';
 import type { AuthUser } from '../auth/types/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -44,6 +50,9 @@ export class ProductsController {
 
   @Public()
   @Get()
+  @UseInterceptors(CacheInterceptor)
+  @CacheKey(buildProductsListCacheKey)
+  @CacheTTL(60_000)
   @ApiOperation({
     summary: 'List products with optional name, category, and price filters',
   })

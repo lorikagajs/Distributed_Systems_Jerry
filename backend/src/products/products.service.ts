@@ -1,14 +1,19 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { RedisClientType } from '@redis/client';
+import type { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { PRODUCTS_LIST_CACHE_PREFIX } from './products-cache.constants';
 
 const productInclude = {
   category: true,
@@ -20,6 +25,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   findAll(tenantId: number, query: ProductQueryDto) {
@@ -61,7 +67,7 @@ export class ProductsService {
 
   async create(tenantId: number, dto: CreateProductDto) {
     await this.ensureCategoryInTenant(tenantId, dto.categoryId);
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: {
         name: dto.name,
         description: dto.description,
@@ -76,6 +82,8 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    await this.invalidateProductsListCache(tenantId);
+    return product;
   }
 
   async update(tenantId: number, id: number, dto: UpdateProductDto) {
@@ -83,7 +91,7 @@ export class ProductsService {
     if (dto.categoryId !== undefined) {
       await this.ensureCategoryInTenant(tenantId, dto.categoryId);
     }
-    return this.prisma.product.update({
+    const product = await this.prisma.product.update({
       where: { id },
       data: {
         name: dto.name,
@@ -95,6 +103,8 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    await this.invalidateProductsListCache(tenantId);
+    return product;
   }
 
   async uploadImage(
@@ -132,7 +142,39 @@ export class ProductsService {
 
   async remove(tenantId: number, id: number) {
     await this.findOne(tenantId, id);
-    return this.prisma.product.delete({ where: { id } });
+    const deleted = await this.prisma.product.delete({ where: { id } });
+    await this.invalidateProductsListCache(tenantId);
+    return deleted;
+  }
+
+  private async invalidateProductsListCache(tenantId: number): Promise<void> {
+    const redis = this.getRedisClient();
+    const pattern = `*${PRODUCTS_LIST_CACHE_PREFIX}:${tenantId}*`;
+
+    if (redis) {
+      const keys = await redis.keys(pattern);
+      if (keys.length > 0) {
+        await redis.del(keys);
+      }
+      return;
+    }
+
+    await this.cacheManager.clear();
+  }
+
+  private getRedisClient(): RedisClientType | null {
+    for (const keyv of this.cacheManager.stores ?? []) {
+      const store = keyv.opts?.store;
+      if (
+        store &&
+        typeof store === 'object' &&
+        'client' in store &&
+        store.client
+      ) {
+        return store.client as RedisClientType;
+      }
+    }
+    return null;
   }
 
   private async ensureCategoryInTenant(tenantId: number, categoryId: number) {
