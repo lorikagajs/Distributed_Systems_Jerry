@@ -13,7 +13,10 @@ import { UpdateProductDto } from './dto/update-product.dto';
 const productInclude = {
   category: true,
   images: { orderBy: { createdAt: 'asc' as const } },
+  reviews: { select: { rating: true } },
 };
+
+type ProductRecord = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
 @Injectable()
 export class ProductsService {
@@ -22,14 +25,15 @@ export class ProductsService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  findAll(tenantId: number, query: ProductQueryDto) {
+  async findAll(tenantId: number, query: ProductQueryDto) {
     const where: Prisma.ProductWhereInput = { tenantId };
+    const search = query.search ?? query.name;
 
-    if (query.name) {
-      where.name = { contains: query.name, mode: 'insensitive' };
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
     }
-    if (query.categoryId !== undefined) {
-      where.categoryId = query.categoryId;
+    if (query.categoryId?.length) {
+      where.categoryId = { in: query.categoryId };
     }
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.price = {};
@@ -41,11 +45,34 @@ export class ProductsService {
       }
     }
 
-    return this.prisma.product.findMany({
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
+
+    const products = await this.prisma.product.findMany({
       where,
       include: productInclude,
-      orderBy: { name: 'asc' },
     });
+
+    const filteredProducts = products
+      .map((product) => this.withAverageRating(product))
+      .filter((product) =>
+        query.minRating === undefined
+          ? true
+          : (product.averageRating ?? 0) >= query.minRating,
+      )
+      .sort((a, b) => this.compareProducts(a, b, query.sort ?? 'newest'));
+
+    const total = filteredProducts.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+
+    return {
+      data: filteredProducts.slice(start, start + limit),
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findOne(tenantId: number, id: number) {
@@ -56,12 +83,12 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with id ${id} not found`);
     }
-    return product;
+    return this.withAverageRating(product);
   }
 
   async create(tenantId: number, dto: CreateProductDto) {
     await this.ensureCategoryInTenant(tenantId, dto.categoryId);
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: {
         name: dto.name,
         description: dto.description,
@@ -76,6 +103,7 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    return this.withAverageRating(product);
   }
 
   async update(tenantId: number, id: number, dto: UpdateProductDto) {
@@ -83,7 +111,7 @@ export class ProductsService {
     if (dto.categoryId !== undefined) {
       await this.ensureCategoryInTenant(tenantId, dto.categoryId);
     }
-    return this.prisma.product.update({
+    const product = await this.prisma.product.update({
       where: { id },
       data: {
         name: dto.name,
@@ -95,6 +123,7 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    return this.withAverageRating(product);
   }
 
   async uploadImage(
@@ -114,19 +143,22 @@ export class ProductsService {
         data: { productId, url: imageUrl },
       });
 
-      const product = await tx.product.findUnique({ where: { id: productId } });
+      const currentProduct = await tx.product.findUnique({
+        where: { id: productId },
+      });
 
-      if (!product?.imageUrl) {
+      if (!currentProduct?.imageUrl) {
         await tx.product.update({
           where: { id: productId },
           data: { imageUrl },
         });
       }
 
-      return tx.product.findUniqueOrThrow({
+      const updatedProduct = await tx.product.findUniqueOrThrow({
         where: { id: productId },
         include: productInclude,
       });
+      return this.withAverageRating(updatedProduct);
     });
   }
 
@@ -143,6 +175,38 @@ export class ProductsService {
       throw new BadRequestException(
         `Category with id ${categoryId} not found in this tenant`,
       );
+    }
+  }
+
+  private withAverageRating(product: ProductRecord) {
+    const { reviews, ...productData } = product;
+    const averageRating =
+      reviews.length === 0
+        ? null
+        : reviews.reduce((sum, review) => sum + review.rating, 0) /
+          reviews.length;
+
+    return {
+      ...productData,
+      averageRating,
+    };
+  }
+
+  private compareProducts(
+    a: ReturnType<ProductsService['withAverageRating']>,
+    b: ReturnType<ProductsService['withAverageRating']>,
+    sort: NonNullable<ProductQueryDto['sort']>,
+  ) {
+    switch (sort) {
+      case 'price_asc':
+        return Number(a.price) - Number(b.price);
+      case 'price_desc':
+        return Number(b.price) - Number(a.price);
+      case 'popular':
+        return (b.averageRating ?? 0) - (a.averageRating ?? 0) || b.id - a.id;
+      case 'newest':
+      default:
+        return b.id - a.id;
     }
   }
 }
