@@ -1,0 +1,25 @@
+{
+  "name": "distributed_systems_jerry",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "json-server --watch db.json --routes routes.json --port 3000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lorikagajs/Distributed_Systems_Jerry.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lorikagajs/Distributed_Systems_Jerry/issues"
+  },
+  "homepage": "https://github.com/lorikagajs/Distributed_Systems_Jerry#readme",
+  "dependencies": {
+    "json-server": "^0.17.4"
+  }
+}
