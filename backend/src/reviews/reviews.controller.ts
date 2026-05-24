@@ -23,25 +23,28 @@ import { resolveTenantId } from '../common/utils/resolve-tenant-id';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { ReviewsService } from './reviews.service';
+import { BaseController } from '../common/base/base.controller';
 
 @ApiTags('Reviews')
 @Controller('reviews')
-export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+export class ReviewsController extends BaseController<ReviewsService> {
+  constructor(reviewsService: ReviewsService) {
+    super(reviewsService);
+  }
 
   @Public()
   @Get()
   @ApiOperation({ summary: 'List reviews for a product' })
   findByProduct(@Query() query: ReviewQueryDto, @Req() req: Request) {
     const tenantId = resolveTenantId(req.tenant, query.tenantId);
-    return this.reviewsService.findByProduct(tenantId, query.productId);
+    return this.service.findByProduct(tenantId, query.productId);
   }
 
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Write a review for a product' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateReviewDto) {
-    return this.reviewsService.create(user.tenantId, user.userId, dto);
+    return this.service.create(this.tenantIdFrom(user), user.userId, dto);
   }
 
   @ApiBearerAuth()
@@ -52,6 +55,6 @@ export class ReviewsController {
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.reviewsService.removeOwn(user.tenantId, user.userId, id);
+    return this.service.removeOwn(this.tenantIdFrom(user), user.userId, id);
   }
 }

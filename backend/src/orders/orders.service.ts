@@ -1,24 +1,32 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Order, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { BaseService } from '../common/base/base.service';
+
+const orderInclude = {
+  items: { include: { product: true } },
+  user: { select: { id: true, email: true } },
+} as const;
+
+type OrderResponse = Prisma.OrderGetPayload<{
+  include: typeof orderInclude;
+}>;
 
 @Injectable()
-export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+export class OrdersService extends BaseService<OrderResponse> {
+  constructor(private readonly prisma: PrismaService) {
+    super('Order');
+  }
 
   findAllForUser(tenantId: number, userId: number) {
     return this.prisma.order.findMany({
       where: { tenantId, userId },
-      include: {
-        items: { include: { product: true } },
-        user: { select: { id: true, email: true } },
-      },
+      include: orderInclude,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -26,15 +34,9 @@ export class OrdersService {
   async findOneForUser(tenantId: number, userId: number, id: number) {
     const order = await this.prisma.order.findFirst({
       where: { id, tenantId, userId },
-      include: {
-        items: { include: { product: true } },
-        user: { select: { id: true, email: true } },
-      },
+      include: orderInclude,
     });
-    if (!order) {
-      throw new NotFoundException(`Order with id ${id} not found`);
-    }
-    return order;
+    return this.ensureEntityFound(order, id);
   }
 
   async create(tenantId: number, userId: number, dto: CreateOrderDto) {
@@ -87,7 +89,7 @@ export class OrdersService {
         include: {
           items: { include: { product: true } },
         },
-      });
+      }) as unknown as Promise<OrderResponse>;
     });
   }
 
@@ -99,16 +101,13 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: { id, tenantId },
     });
-    if (!order) {
-      throw new NotFoundException(`Order with id ${id} not found`);
-    }
+    this.ensureFound(order, 'Order', id);
     return this.prisma.order.update({
       where: { id },
       data: { status: dto.status },
       include: {
         items: { include: { product: true } },
       },
-    });
+    }) as unknown as Promise<OrderResponse>;
   }
-
 }

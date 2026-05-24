@@ -1,16 +1,17 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddWishlistItemDto } from './dto/add-wishlist-item.dto';
+import { BaseService } from '../common/base/base.service';
 
 @Injectable()
-export class WishlistService {
-  constructor(private readonly prisma: PrismaService) {}
+export class WishlistService extends BaseService {
+  constructor(private readonly prisma: PrismaService) {
+    super('Wishlist');
+  }
 
   async getWishlist(tenantId: number, userId: number) {
     const wishlist = await this.getOrCreateWishlist(tenantId, userId);
@@ -42,13 +43,7 @@ export class WishlistService {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Product is already in the wishlist');
-      }
-      throw error;
+      this.handleUniqueConstraint(error, 'Product is already in the wishlist');
     }
 
     return this.getWishlist(tenantId, userId);
@@ -69,13 +64,9 @@ export class WishlistService {
       },
     });
 
-    if (!item) {
-      throw new NotFoundException(
-        `Product with id ${productId} is not in the wishlist`,
-      );
-    }
+    const found = this.ensureFound(item, 'Wishlist item', productId);
 
-    await this.prisma.wishlistItem.delete({ where: { id: item.id } });
+    await this.prisma.wishlistItem.delete({ where: { id: found.id } });
     return this.getWishlist(tenantId, userId);
   }
 

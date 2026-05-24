@@ -1,18 +1,19 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Review } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { BaseService } from '../common/base/base.service';
 
 @Injectable()
-export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class ReviewsService extends BaseService<Review> {
+  constructor(private readonly prisma: PrismaService) {
+    super('Review');
+  }
 
   findByProduct(tenantId: number, productId: number) {
     return this.prisma.review.findMany({
@@ -33,10 +34,7 @@ export class ReviewsService {
         user: { select: { id: true, email: true } },
       },
     });
-    if (!review) {
-      throw new NotFoundException(`Review with id ${id} not found`);
-    }
-    return review;
+    return this.ensureEntityFound(review, id);
   }
 
   async create(tenantId: number, userId: number, dto: CreateReviewDto) {
@@ -64,13 +62,10 @@ export class ReviewsService {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('You have already reviewed this product');
-      }
-      throw error;
+      this.handleUniqueConstraint(
+        error,
+        'You have already reviewed this product',
+      );
     }
   }
 

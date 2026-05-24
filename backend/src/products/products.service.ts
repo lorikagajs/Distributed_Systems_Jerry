@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -9,20 +8,37 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { BaseService } from '../common/base/base.service';
+import { TenantScopedCrudService } from '../common/interfaces/crud-service.interface';
 
 const productInclude = {
   category: true,
   images: { orderBy: { createdAt: 'asc' as const } },
-};
+} as const;
+
+type ProductResponse = Prisma.ProductGetPayload<{
+  include: typeof productInclude;
+}>;
 
 @Injectable()
-export class ProductsService {
+export class ProductsService
+  extends BaseService<ProductResponse>
+  implements
+    TenantScopedCrudService<
+      ProductResponse,
+      CreateProductDto,
+      UpdateProductDto,
+      ProductQueryDto
+    >
+{
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
-  ) {}
+  ) {
+    super('Product');
+  }
 
-  findAll(tenantId: number, query: ProductQueryDto) {
+  findAll(tenantId: number, query: ProductQueryDto = {}) {
     const where: Prisma.ProductWhereInput = { tenantId };
 
     if (query.name) {
@@ -53,10 +69,7 @@ export class ProductsService {
       where: { id, tenantId },
       include: productInclude,
     });
-    if (!product) {
-      throw new NotFoundException(`Product with id ${id} not found`);
-    }
-    return product;
+    return this.ensureEntityFound(product, id);
   }
 
   async create(tenantId: number, dto: CreateProductDto) {
@@ -131,8 +144,9 @@ export class ProductsService {
   }
 
   async remove(tenantId: number, id: number) {
-    await this.findOne(tenantId, id);
-    return this.prisma.product.delete({ where: { id } });
+    const product = await this.findOne(tenantId, id);
+    await this.prisma.product.delete({ where: { id } });
+    return product;
   }
 
   private async ensureCategoryInTenant(tenantId: number, categoryId: number) {

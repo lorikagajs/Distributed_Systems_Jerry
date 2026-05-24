@@ -1,15 +1,17 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { BaseService } from '../common/base/base.service';
 
 @Injectable()
-export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
+export class CartService extends BaseService {
+  constructor(private readonly prisma: PrismaService) {
+    super('Cart');
+  }
 
   async getCart(tenantId: number, userId: number) {
     const cart = await this.getOrCreateCart(tenantId, userId);
@@ -71,9 +73,7 @@ export class CartService {
       where: { id: itemId, cartId: cart.id },
     });
 
-    if (!item) {
-      throw new NotFoundException(`Cart item with id ${itemId} not found`);
-    }
+    this.ensureFound(item, 'Cart item', itemId);
 
     await this.prisma.cartItem.update({
       where: { id: itemId },
@@ -89,11 +89,9 @@ export class CartService {
       where: { id: itemId, cartId: cart.id },
     });
 
-    if (!item) {
-      throw new NotFoundException(`Cart item with id ${itemId} not found`);
-    }
+    const found = this.ensureFound(item, 'Cart item', itemId);
 
-    await this.prisma.cartItem.delete({ where: { id: item.id } });
+    await this.prisma.cartItem.delete({ where: { id: found.id } });
     return this.getCart(tenantId, userId);
   }
 

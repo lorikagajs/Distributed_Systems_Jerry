@@ -22,17 +22,20 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
+import { BaseController } from '../common/base/base.controller';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
 @Controller('orders')
-export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+export class OrdersController extends BaseController<OrdersService> {
+  constructor(ordersService: OrdersService) {
+    super(ordersService);
+  }
 
   @Get()
   @ApiOperation({ summary: 'List your orders' })
   findAll(@CurrentUser() user: AuthUser) {
-    return this.ordersService.findAllForUser(user.tenantId, user.userId);
+    return this.service.findAllForUser(this.tenantIdFrom(user), user.userId);
   }
 
   @Get(':id')
@@ -42,13 +45,13 @@ export class OrdersController {
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.ordersService.findOneForUser(user.tenantId, user.userId, id);
+    return this.service.findOneForUser(this.tenantIdFrom(user), user.userId, id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Place a new order' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
-    return this.ordersService.create(user.tenantId, user.userId, dto);
+    return this.service.create(this.tenantIdFrom(user), user.userId, dto);
   }
 
   @UseGuards(RolesGuard)
@@ -61,6 +64,6 @@ export class OrdersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateStatus(user.tenantId, id, dto);
+    return this.service.updateStatus(this.tenantIdFrom(user), id, dto);
   }
 }

@@ -36,11 +36,14 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 import type { AuthUser } from '../auth/types/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { BaseController } from '../common/base/base.controller';
 
 @ApiTags('Products')
 @Controller('products')
-export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+export class ProductsController extends BaseController<ProductsService> {
+  constructor(productsService: ProductsService) {
+    super(productsService);
+  }
 
   @Public()
   @Get()
@@ -50,7 +53,7 @@ export class ProductsController {
   findAll(@Query() query: PublicProductQueryDto, @Req() req: Request) {
     const { tenantId: queryTenantId, ...filters } = query;
     const tenantId = resolveTenantId(req.tenant, queryTenantId);
-    return this.productsService.findAll(tenantId, filters);
+    return this.service.findAll(tenantId, filters);
   }
 
   @Public()
@@ -63,7 +66,7 @@ export class ProductsController {
     @Req() req: Request,
   ) {
     const tenantId = resolveTenantId(req.tenant, query.tenantId);
-    return this.productsService.findOne(tenantId, id);
+    return this.service.findOne(tenantId, id);
   }
 
   @ApiBearerAuth()
@@ -72,7 +75,7 @@ export class ProductsController {
   @Post()
   @ApiOperation({ summary: 'Create a product (admin only)' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateProductDto) {
-    return this.productsService.create(user.tenantId, dto);
+    return this.service.create(this.tenantIdFrom(user), dto);
   }
 
   @ApiBearerAuth()
@@ -110,7 +113,7 @@ export class ProductsController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.productsService.uploadImage(user.tenantId, id, file);
+    return this.service.uploadImage(this.tenantIdFrom(user), id, file);
   }
 
   @ApiBearerAuth()
@@ -124,7 +127,7 @@ export class ProductsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.productsService.update(user.tenantId, id, dto);
+    return this.service.update(this.tenantIdFrom(user), id, dto);
   }
 
   @ApiBearerAuth()
@@ -137,6 +140,6 @@ export class ProductsController {
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.productsService.remove(user.tenantId, id);
+    return this.service.remove(this.tenantIdFrom(user), id);
   }
 }

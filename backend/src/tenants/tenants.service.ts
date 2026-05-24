@@ -1,11 +1,11 @@
 import {
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { Prisma, Tenant, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
+import { BaseService } from '../common/base/base.service';
 
 const publicConfigSelect = {
   slug: true,
@@ -18,15 +18,18 @@ const publicConfigSelect = {
 } satisfies Prisma.TenantSelect;
 
 @Injectable()
-export class TenantsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class TenantsService extends BaseService<Tenant> {
+  constructor(private readonly prisma: PrismaService) {
+    super('Tenant');
+  }
 
   findAll() {
     return this.prisma.tenant.findMany();
   }
 
-  findOne(id: number) {
-    return this.prisma.tenant.findUnique({ where: { id } });
+  async findOne(id: number) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    return this.ensureEntityFound(tenant, id);
   }
 
   findBySlug(slug: string) {
@@ -39,11 +42,7 @@ export class TenantsService {
       select: publicConfigSelect,
     });
 
-    if (!tenant) {
-      throw new NotFoundException(`Tenant "${slug}" not found`);
-    }
-
-    return tenant;
+    return this.ensureFound(tenant, 'Tenant', slug);
   }
 
   async updateTenantConfig(
@@ -54,11 +53,9 @@ export class TenantsService {
   ) {
     const tenant = await this.findBySlug(slug);
 
-    if (!tenant || !tenant.isActive) {
-      throw new NotFoundException(`Tenant "${slug}" not found`);
-    }
+    this.ensureFound(tenant && tenant.isActive ? tenant : null, 'Tenant', slug);
 
-    if (userRole !== UserRole.ADMIN || userTenantId !== tenant.id) {
+    if (userRole !== UserRole.ADMIN || userTenantId !== tenant!.id) {
       throw new ForbiddenException(
         'Only an admin of this tenant can update store configuration',
       );
@@ -75,7 +72,7 @@ export class TenantsService {
     return this.prisma.tenant.create({ data });
   }
 
-  update(
+  async update(
     id: number,
     data: Partial<{
       name: string;
@@ -84,10 +81,12 @@ export class TenantsService {
       isActive: boolean;
     }>,
   ) {
+    await this.findOne(id);
     return this.prisma.tenant.update({ where: { id }, data });
   }
 
-  remove(id: number) {
+  async remove(id: number) {
+    await this.findOne(id);
     return this.prisma.tenant.delete({ where: { id } });
   }
 }

@@ -24,18 +24,21 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 import { TenantsService } from './tenants.service';
+import { BaseController } from '../common/base/base.controller';
 
 @ApiTags('Tenants')
 @Controller('tenants')
-export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+export class TenantsController extends BaseController<TenantsService> {
+  constructor(tenantsService: TenantsService) {
+    super(tenantsService);
+  }
 
   @Public()
   @Get(':slug/config')
   @ApiOperation({ summary: 'Get public store configuration for a tenant' })
   @ApiParam({ name: 'slug', example: 'tech-store' })
   getConfig(@Param('slug') slug: string) {
-    return this.tenantsService.getTenantConfig(slug);
+    return this.service.getTenantConfig(slug);
   }
 
   @ApiBearerAuth()
@@ -49,7 +52,7 @@ export class TenantsController {
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateTenantConfigDto,
   ) {
-    return this.tenantsService.updateTenantConfig(
+    return this.service.updateTenantConfig(
       slug,
       user.tenantId,
       user.role,
@@ -61,7 +64,7 @@ export class TenantsController {
   @Get()
   @ApiOperation({ summary: 'Get all tenants' })
   findAll() {
-    return this.tenantsService.findAll();
+    return this.service.findAll();
   }
 
   @Public()
@@ -69,7 +72,7 @@ export class TenantsController {
   @ApiOperation({ summary: 'Get a tenant by numeric ID' })
   @ApiParam({ name: 'id', type: Number })
   findOne(@Param('id') id: string) {
-    return this.tenantsService.findOne(+id);
+    return this.service.findOne(+id);
   }
 
   @Public()
@@ -85,7 +88,7 @@ export class TenantsController {
     },
   })
   create(@Body() body: CreateTenantDto) {
-    return this.tenantsService.create(body);
+    return this.service.create(body);
   }
 
   @Public()
@@ -93,7 +96,7 @@ export class TenantsController {
   @ApiOperation({ summary: 'Update a tenant by numeric ID' })
   @ApiParam({ name: 'id', type: Number })
   update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.tenantsService.update(+id, body);
+    return this.service.update(+id, body);
   }
 
   @Public()
@@ -101,6 +104,6 @@ export class TenantsController {
   @ApiOperation({ summary: 'Delete a tenant by numeric ID' })
   @ApiParam({ name: 'id', type: Number })
   remove(@Param('id') id: string) {
-    return this.tenantsService.remove(+id);
+    return this.service.remove(+id);
   }
 }
