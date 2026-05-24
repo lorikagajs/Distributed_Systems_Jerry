@@ -13,11 +13,11 @@ import { UpdateCouponDto } from './dto/update-coupon.dto';
 
 @Injectable()
 export class CouponsService
-  extends BaseService
+  extends BaseService<Coupon>
   implements TenantScopedCrudService<Coupon, CreateCouponDto, UpdateCouponDto>
 {
   constructor(private readonly prisma: PrismaService) {
-    super();
+    super('Coupon');
   }
 
   findAll(tenantId: number) {
@@ -32,7 +32,7 @@ export class CouponsService
       where: { id, tenantId },
     });
 
-    return this.ensureFound(coupon, 'Coupon', id);
+    return this.ensureEntityFound(coupon, id);
   }
 
   async create(tenantId: number, dto: CreateCouponDto) {

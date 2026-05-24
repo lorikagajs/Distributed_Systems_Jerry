@@ -1,14 +1,22 @@
 export type MaybePromise<T> = T | Promise<T>;
 
+export interface ICrudService<
+  Entity,
+  CreateDto,
+  UpdateDto,
+  QueryDto = void,
+  Scope = void,
+> {
+  findAll(scope: Scope, query?: QueryDto): MaybePromise<Entity[]>;
+  findOne(scope: Scope, id: number): MaybePromise<Entity>;
+  create(scope: Scope, dto: CreateDto): MaybePromise<Entity>;
+  update(scope: Scope, id: number, dto: UpdateDto): MaybePromise<Entity>;
+  remove(scope: Scope, id: number): MaybePromise<Entity>;
+}
+
 export interface TenantScopedCrudService<
   Entity,
   CreateDto,
   UpdateDto,
   QueryDto = void,
-> {
-  findAll(tenantId: number, query?: QueryDto): MaybePromise<Entity[]>;
-  findOne(tenantId: number, id: number): MaybePromise<Entity>;
-  create(tenantId: number, dto: CreateDto): MaybePromise<Entity>;
-  update(tenantId: number, id: number, dto: UpdateDto): MaybePromise<Entity>;
-  remove(tenantId: number, id: number): MaybePromise<Entity>;
-}
+> extends ICrudService<Entity, CreateDto, UpdateDto, QueryDto, number> {}

@@ -8,17 +8,25 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const BCRYPT_ROUNDS = 10;
+const userSelect = {
+  id: true,
+  email: true,
+  role: true,
+  tenantId: true,
+  createdAt: true,
+} as const;
+
 type UserResponse = Prisma.UserGetPayload<{
-  select: ReturnType<UsersService['userSelect']>;
+  select: typeof userSelect;
 }>;
 
 @Injectable()
 export class UsersService
-  extends BaseService
+  extends BaseService<UserResponse>
   implements TenantScopedCrudService<UserResponse, CreateUserDto, UpdateUserDto>
 {
   constructor(private readonly prisma: PrismaService) {
-    super();
+    super('User');
   }
 
   findAll(tenantId: number) {
@@ -35,7 +43,7 @@ export class UsersService
       select: this.userSelect(),
     });
 
-    return this.ensureFound(user, 'User', id);
+    return this.ensureEntityFound(user, id);
   }
 
   async create(tenantId: number, dto: CreateUserDto) {
@@ -109,12 +117,6 @@ export class UsersService
   }
 
   userSelect() {
-    return {
-      id: true,
-      email: true,
-      role: true,
-      tenantId: true,
-      createdAt: true,
-    } as const;
+    return userSelect;
   }
 }

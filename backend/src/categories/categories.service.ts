@@ -8,12 +8,12 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class CategoriesService
-  extends BaseService
+  extends BaseService<Category>
   implements
     TenantScopedCrudService<Category, CreateCategoryDto, UpdateCategoryDto>
 {
   constructor(private readonly prisma: PrismaService) {
-    super();
+    super('Category');
   }
 
   findAll(tenantId: number) {
@@ -28,7 +28,7 @@ export class CategoriesService
       where: { id, tenantId },
     });
 
-    return this.ensureFound(category, 'Category', id);
+    return this.ensureEntityFound(category, id);
   }
 
   async create(tenantId: number, dto: CreateCategoryDto) {
