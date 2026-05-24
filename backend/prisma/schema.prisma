@@ -83,6 +83,7 @@ model Tenant {
 model User {
   id        Int      @id @default(autoincrement())
   email     String
+  name      String?
   password  String
   role      UserRole @default(CUSTOMER)
   tenantId  Int

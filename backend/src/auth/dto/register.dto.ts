@@ -10,6 +10,11 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
+  @ApiPropertyOptional({ example: 'Jane Doe' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
   @ApiProperty({ example: 'user@store.com' })
   @IsEmail()
   email!: string;
