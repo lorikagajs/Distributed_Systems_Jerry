@@ -4,9 +4,10 @@ import React, {
   useContext,
   useMemo,
   useState,
+  useEffect,
 } from 'react';
 import axios from 'axios';
-import { setTenantId } from '../api/axiosInstance';
+import { setTenantId, setTenantSlug } from '../api/axiosInstance';
 import { getTenantConfig, type TenantConfig } from '../api/tenants';
 
 export type { TenantConfig };
@@ -43,6 +44,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     setSlug(null);
     setError(null);
     setTenantId(null);
+    setTenantSlug(null);
     applyTheme(null);
   }, []);
 
@@ -54,11 +56,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       const config = await getTenantConfig(tenantSlug);
       setTenant(config);
-      setTenantId(config.tenantId);
+      setTenantId(config.id);
+      setTenantSlug(config.slug);
       applyTheme(config);
     } catch (err) {
       setTenant(null);
       setTenantId(null);
+      setTenantSlug(null);
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         setError('Tenant not found');
       } else {
@@ -69,6 +73,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const firstSegment = window.location.pathname.split('/')[1];
+    const skipList = ['tenants', 'auth', 'health', ''];
+    if (firstSegment && !skipList.includes(firstSegment)) {
+      void loadTenant(firstSegment);
+    }
+  }, [loadTenant]);
 
   const value = useMemo(
     () => ({

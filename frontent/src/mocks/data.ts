@@ -30,6 +30,7 @@ export const MOCK_TENANT_LIST: TenantListItem[] = [
 
 export const MOCK_TENANT_CONFIGS: Record<string, TenantConfig> = {
   nike: {
+    id: 1,
     tenantId: 1,
     slug: 'nike',
     storeName: 'Nike Official Outlet',
@@ -43,6 +44,7 @@ export const MOCK_TENANT_CONFIGS: Record<string, TenantConfig> = {
       'Just Do It. Shop the latest Nike sneakers and apparel.',
   },
   adidas: {
+    id: 2,
     tenantId: 2,
     slug: 'adidas',
     storeName: 'Adidas Zone',

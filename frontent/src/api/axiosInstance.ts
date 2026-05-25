@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-/** Paths that must not receive an automatic tenantId query param */
-const SKIP_TENANT_QUERY_PREFIXES = ['/tenants', '/auth'];
+/** Paths that must not receive an automatic tenant slug prefix */
+const SKIP_PREPEND_PREFIXES = ['/tenants', '/auth'];
 
 let currentTenantId: number | null = null;
+let currentTenantSlug: string | null = null;
 
 export function setTenantId(tenantId: number | null) {
   currentTenantId = tenantId;
@@ -11,6 +12,14 @@ export function setTenantId(tenantId: number | null) {
 
 export function getTenantId() {
   return currentTenantId;
+}
+
+export function setTenantSlug(slug: string | null) {
+  currentTenantSlug = slug;
+}
+
+export function getTenantSlug() {
+  return currentTenantSlug;
 }
 
 const axiosInstance = axios.create({
@@ -24,15 +33,15 @@ axiosInstance.interceptors.request.use((config) => {
   }
 
   const url = config.url ?? '';
-  const skipTenant =
-    SKIP_TENANT_QUERY_PREFIXES.some((prefix) => url.startsWith(prefix)) ||
-    currentTenantId == null;
+  const skipPrepend =
+    SKIP_PREPEND_PREFIXES.some((prefix) => url.startsWith(prefix)) ||
+    !currentTenantSlug ||
+    url.startsWith(`/${currentTenantSlug}/`) ||
+    url.startsWith(`${currentTenantSlug}/`);
 
-  if (!skipTenant) {
-    config.params = {
-      ...(config.params as Record<string, unknown>),
-      tenantId: currentTenantId,
-    };
+  if (!skipPrepend && config.url) {
+    const cleanUrl = config.url.startsWith('/') ? config.url : `/${config.url}`;
+    config.url = `/${currentTenantSlug}${cleanUrl}`;
   }
 
   return config;

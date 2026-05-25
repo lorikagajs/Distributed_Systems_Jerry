@@ -1,9 +1,9 @@
-import axios from 'axios';
 import axiosInstance from './axiosInstance';
 import { isMockMode } from '../config/env';
 import { mockGetAllTenants, mockGetTenantConfig } from '../mocks/mockApi';
 
 export interface TenantConfig {
+  id: number;
   tenantId: number;
   slug: string;
   storeName: string;
@@ -29,67 +29,53 @@ interface BackendTenant {
   slug: string;
   email: string;
   isActive: boolean;
-  tenantSettings?: {
-    logoUrl: string | null;
-    primaryColor: string | null;
-    currency: string;
-  } | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  bannerUrl: string | null;
+  storeName: string | null;
+  storeDescription: string | null;
 }
 
 const DEFAULT_PRIMARY = '#4f46e5';
 const DEFAULT_SECONDARY = '#7c3aed';
 
 function mapTenantConfig(tenant: BackendTenant): TenantConfig {
-  const settings = tenant.tenantSettings;
   return {
+    id: tenant.id,
     tenantId: tenant.id,
     slug: tenant.slug,
-    storeName: tenant.name,
-    logoUrl: settings?.logoUrl ?? null,
-    primaryColor: settings?.primaryColor ?? DEFAULT_PRIMARY,
-    secondaryColor: DEFAULT_SECONDARY,
-    bannerUrl: null,
-    storeDescription: null,
+    storeName: tenant.storeName || tenant.name,
+    logoUrl: tenant.logoUrl,
+    primaryColor: tenant.primaryColor ?? DEFAULT_PRIMARY,
+    secondaryColor: tenant.secondaryColor ?? DEFAULT_SECONDARY,
+    bannerUrl: tenant.bannerUrl,
+    storeDescription: tenant.storeDescription,
   };
 }
 
 function mapTenantListItem(t: BackendTenant): TenantListItem {
-  const settings = t.tenantSettings;
   return {
     slug: t.slug,
-    storeName: t.name,
-    storeDescription: null,
-    primaryColor: settings?.primaryColor ?? DEFAULT_PRIMARY,
-    secondaryColor: DEFAULT_SECONDARY,
-    bannerUrl: null,
+    storeName: t.storeName || t.name,
+    storeDescription: t.storeDescription,
+    primaryColor: t.primaryColor ?? DEFAULT_PRIMARY,
+    secondaryColor: t.secondaryColor ?? DEFAULT_SECONDARY,
+    bannerUrl: t.bannerUrl,
   };
 }
 
 export async function getTenantConfig(slug: string): Promise<TenantConfig> {
   if (isMockMode()) {
-    return mockGetTenantConfig(slug);
+    const config = await mockGetTenantConfig(slug);
+    return {
+      ...config,
+      id: config.tenantId, // Add id to mock configuration object
+    };
   }
 
-  const { data } = await axiosInstance.get<BackendTenant[]>('/tenants');
-  const tenant = data.find((t) => t.slug === slug && t.isActive);
-
-  if (!tenant) {
-    throw new axios.AxiosError(
-      'Tenant not found',
-      'ERR_NOT_FOUND',
-      undefined,
-      undefined,
-      {
-        status: 404,
-        statusText: 'Not Found',
-        data: { message: 'Tenant not found' },
-        headers: {},
-        config: {} as never,
-      },
-    );
-  }
-
-  return mapTenantConfig(tenant);
+  const { data } = await axiosInstance.get<BackendTenant>(`/tenants/${slug}/config`);
+  return mapTenantConfig(data);
 }
 
 export async function getAllTenants(): Promise<TenantListItem[]> {

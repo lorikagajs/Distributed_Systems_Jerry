@@ -8,6 +8,7 @@ import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 import { BaseService } from '../common/base/base.service';
 
 const publicConfigSelect = {
+  id: true,
   slug: true,
   storeName: true,
   logoUrl: true,

@@ -55,7 +55,7 @@ export function ProductsPage() {
 
   const updateParams = useCallback(
     (updates: Record<string, string | string[] | null | undefined>) => {
-      setSearchParams((prev) => {
+      setSearchParams((prev: URLSearchParams) => {
         const next = new URLSearchParams(prev);
 
         for (const [key, value] of Object.entries(updates)) {
