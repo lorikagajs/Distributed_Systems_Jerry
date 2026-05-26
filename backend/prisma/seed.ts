@@ -688,6 +688,83 @@ const sampleTenants: SeedTenant[] = [
       },
     ],
   },
+  {
+    name: 'Book Haven',
+    slug: 'book-haven',
+    email: 'admin@book-haven.local',
+    storeName: 'Book Haven',
+    storeDescription:
+      'A curated collection of novels, classic literature, and beautiful stationery.',
+    primaryColor: '#8b5cf6',
+    secondaryColor: '#6d28d9',
+    logoUrl:
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=200&h=200&fit=crop',
+    bannerUrl:
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=1200',
+    categories: ['Fiction', 'Non-Fiction', 'Stationery'],
+    products: [
+      {
+        name: 'The Midnight Library',
+        description:
+          'Between life and death there is a library, and within that library, the shelves go on forever.',
+        price: 14.99,
+        stock: 40,
+        category: 'Fiction',
+        imageUrl:
+          'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800',
+      },
+      {
+        name: 'The Great Gatsby',
+        description:
+          'F. Scott Fitzgerald\'s landmark 1925 novel which tells the story of the mysterious millionaire Jay Gatsby.',
+        price: 9.99,
+        stock: 50,
+        category: 'Fiction',
+        imageUrl:
+          'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=800',
+      },
+      {
+        name: 'Sapiens: A Brief History of Humankind',
+        description:
+          'Yuval Noah Harari explores the history of human species, from the evolutionary stages to the modern age.',
+        price: 19.99,
+        stock: 35,
+        category: 'Non-Fiction',
+        imageUrl:
+          'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=800',
+      },
+      {
+        name: 'Atomic Habits',
+        description:
+          'James Clear presents a proven framework for improving every day with small, easy-to-do habits.',
+        price: 16.99,
+        stock: 60,
+        category: 'Non-Fiction',
+        imageUrl:
+          'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800',
+      },
+      {
+        name: 'Classic Moleskine Notebook',
+        description:
+          'Hardcover ruled notebook, expandable inner pocket, elastic closure, and ribbon bookmark.',
+        price: 22.99,
+        stock: 80,
+        category: 'Stationery',
+        imageUrl:
+          'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=800',
+      },
+      {
+        name: 'Elegant Fountain Pen',
+        description:
+          'Premium lacquer finish, gold-plated steel nib, and a comfortable grip for fine writing.',
+        price: 45.0,
+        stock: 25,
+        category: 'Stationery',
+        imageUrl:
+          'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=800',
+      },
+    ],
+  },
 ];
 
 function validateTenantProducts(tenant: SeedTenant) {
@@ -708,7 +785,7 @@ function validateTenantProducts(tenant: SeedTenant) {
 async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
-  console.log('\n--- Seeding database (5 shops) ---\n');
+  console.log('\n--- Seeding database (6 shops) ---\n');
 
   for (const tenantData of sampleTenants) {
     validateTenantProducts(tenantData);
@@ -850,7 +927,7 @@ async function main() {
     console.log(`    Admin:    ${tenantData.email} / ${DEMO_PASSWORD}`);
   }
 
-  console.log('\n--- Seed complete: 5 shops ready ---\n');
+  console.log('\n--- Seed complete: 6 shops ready ---\n');
 }
 
 for (const tenant of sampleTenants) {

@@ -13,7 +13,7 @@ Start Docker Desktop, then:
 docker compose up -d
 ```
 
-Postgres: `jerry` / `jerry_secret` on `localhost:5432`, database `jerry_ecommerce`.
+Postgres: `jerry` / `jerry_secret` on `localhost:5433`, database `jerry_ecommerce`.
 
 ### 2. Backend
 
