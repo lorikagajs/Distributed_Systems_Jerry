@@ -1,14 +1,19 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { RedisClientType } from '@redis/client';
+import type { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto, ProductSortOption } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { PRODUCTS_LIST_CACHE_PREFIX } from './products-cache.constants';
 
 const productInclude = {
   category: true,
@@ -25,6 +30,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   async findAll(tenantId: number, query: ProductQueryDto) {
@@ -110,6 +116,7 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    await this.invalidateProductsListCache(tenantId);
     return this.withAverageRating(created);
   }
 
@@ -130,46 +137,87 @@ export class ProductsService {
       },
       include: productInclude,
     });
+    await this.invalidateProductsListCache(tenantId);
     return this.withAverageRating(updated);
   }
-
+  
   async uploadImage(
-    tenantId: number,
-    productId: number,
-    file?: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Image file is required');
-    }
-
-    await this.findOne(tenantId, productId);
-    const imageUrl = await this.cloudinaryService.uploadImage(file);
-
-    return this.prisma.$transaction(async (tx) => {
-      await tx.productImage.create({
-        data: { productId, url: imageUrl },
-      });
-
-      const product = await tx.product.findUnique({ where: { id: productId } });
-
-      if (!product?.imageUrl) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { imageUrl },
-        });
-      }
-
-      const result = await tx.product.findUniqueOrThrow({
-        where: { id: productId },
-        include: productInclude,
-      });
-      return this.withAverageRating(result);
-    });
+  tenantId: number,
+  productId: number,
+  file?: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('Image file is required');
   }
 
+  await this.findOne(tenantId, productId);
+
+  const imageUrl = await this.cloudinaryService.uploadImage(file);
+
+  const result = await this.prisma.$transaction(async (tx) => {
+    await tx.productImage.create({
+      data: { productId, url: imageUrl },
+    });
+
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product?.imageUrl) {
+      await tx.product.update({
+        where: { id: productId },
+        data: { imageUrl },
+      });
+    }
+
+    const updatedProduct = await tx.product.findUniqueOrThrow({
+      where: { id: productId },
+      include: productInclude,
+    });
+
+    return this.withAverageRating(updatedProduct);
+  });
+
+  await this.invalidateProductsListCache(tenantId);
+
+  return result;
+}
+  
   async remove(tenantId: number, id: number) {
     await this.findOne(tenantId, id);
-    return this.prisma.product.delete({ where: { id } });
+    const deleted = await this.prisma.product.delete({ where: { id } });
+    await this.invalidateProductsListCache(tenantId);
+    return deleted;
+  }
+
+  private async invalidateProductsListCache(tenantId: number): Promise<void> {
+    const redis = this.getRedisClient();
+    const pattern = `*${PRODUCTS_LIST_CACHE_PREFIX}:${tenantId}*`;
+
+    if (redis) {
+      const keys = await redis.keys(pattern);
+      if (keys.length > 0) {
+        await redis.del(keys);
+      }
+      return;
+    }
+
+    await this.cacheManager.clear();
+  }
+
+  private getRedisClient(): RedisClientType | null {
+    for (const keyv of this.cacheManager.stores ?? []) {
+      const store = keyv.opts?.store;
+      if (
+        store &&
+        typeof store === 'object' &&
+        'client' in store &&
+        store.client
+      ) {
+        return store.client as RedisClientType;
+      }
+    }
+    return null;
   }
 
   private withAverageRating(product: ProductWithRelations) {

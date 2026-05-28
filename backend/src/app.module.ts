@@ -1,8 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { CacheModule } from '@nestjs/cache-manager';
+import KeyvRedis from '@keyv/redis';
+import { Keyv } from 'keyv';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { AppController } from './app.controller';
@@ -18,15 +20,34 @@ import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WishlistModule } from './wishlist/wishlist.module';
-import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => {
+        const ttlMs = Number(config.get('CACHE_TTL', 60)) * 1000;
+        const redisUrl = config.get<string>(
+          'REDIS_URL',
+          'redis://localhost:6379',
+        );
+        return {
+          stores: [
+            new Keyv({
+              store: new KeyvRedis(redisUrl),
+              ttl: ttlMs,
+            }),
+          ],
+          ttl: ttlMs,
+        };
+      },
+      inject: [ConfigService],
+    }),
     PrismaModule,
     TenantsModule,
     AuthModule,
-    UsersModule,
     CategoriesModule,
     ProductsModule,
     OrdersModule,
@@ -45,6 +66,6 @@ import { UsersModule } from './users/users.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggingMiddleware, TenantMiddleware).forRoutes('*');
+    consumer.apply(TenantMiddleware).forRoutes('*');
   }
 }
