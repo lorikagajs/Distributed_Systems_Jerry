@@ -19,6 +19,7 @@ import { StarRating } from '../components/ui/StarRating';
 import { StarRatingInput } from '../components/ui/StarRatingInput';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { useTenantPath } from '../hooks/useTenantNavigate';
 import type { Product, Review } from '../types';
 
@@ -39,6 +40,7 @@ export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const productId = Number(id);
   const { token } = useAuth();
+  const { syncCartCount } = useCart();
   const tenantPath = useTenantPath();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -150,7 +152,8 @@ export function ProductDetailPage() {
 
     setAddingToCart(true);
     try {
-      await addToCart(product.id, quantity);
+      const cart = await addToCart(product.id, quantity);
+      syncCartCount(cart);
       showToast('success', 'Added to cart successfully');
     } catch {
       showToast('error', 'Could not add to cart. Please try again.');
@@ -444,6 +447,7 @@ export function ProductDetailPage() {
             <p className="mt-3 text-sm text-gray-600">
               <Link
                 to={tenantPath('/login')}
+                state={{ message: 'Please login to write a review' }}
                 className="font-medium text-[var(--color-primary)] hover:underline"
               >
                 Login to write a review

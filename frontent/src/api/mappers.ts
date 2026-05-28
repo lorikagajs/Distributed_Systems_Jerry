@@ -4,9 +4,12 @@ import type {
   Category,
   Order,
   OrderItem,
+  OrderPayment,
+  PaymentMethod,
   Product,
   Review,
   User,
+  UserProfile,
 } from '../types';
 
 function slugify(name: string): string {
@@ -87,9 +90,18 @@ export function mapCartItem(raw: {
   id: number;
   productId: number;
   quantity: number;
-  product: Parameters<typeof mapProduct>[0];
+  product?: Parameters<typeof mapProduct>[0] | null;
 }): CartItem {
-  const product = mapProduct(raw.product);
+  const product = mapProduct(
+    raw.product ?? {
+      id: raw.productId,
+      name: 'Product',
+      price: 0,
+      stock: 0,
+      categoryId: 0,
+      tenantId: 0,
+    },
+  );
   return {
     id: raw.id,
     productId: raw.productId,
@@ -101,9 +113,9 @@ export function mapCartItem(raw: {
 
 export function mapCart(raw: {
   id: number;
-  items: Parameters<typeof mapCartItem>[0][];
+  items?: Parameters<typeof mapCartItem>[0][] | null;
 }): Cart {
-  const items = raw.items.map(mapCartItem);
+  const items = (raw.items ?? []).map(mapCartItem);
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
@@ -128,18 +140,97 @@ export function mapOrderItem(raw: {
   };
 }
 
+function mapShippingAddress(raw: {
+  line1?: string;
+  line2?: string | null;
+  street?: string;
+  city: string;
+  state?: string | null;
+  postalCode?: string;
+  zipCode?: string;
+  country: string;
+} | null | undefined): Order['shippingAddress'] {
+  if (!raw) return null;
+  const line1 = raw.line1 ?? raw.street;
+  if (!line1 || !raw.city || !raw.country) return null;
+  return {
+    line1,
+    line2: raw.line2 ?? null,
+    city: raw.city,
+    state: raw.state ?? null,
+    postalCode: raw.postalCode ?? raw.zipCode ?? '',
+    country: raw.country,
+  };
+}
+
+function mapOrderPayment(raw: {
+  id: number;
+  method: string;
+  status: string;
+  amount: unknown;
+  createdAt: string;
+}): OrderPayment {
+  return {
+    id: raw.id,
+    method: raw.method as PaymentMethod,
+    status: raw.status,
+    amount: toNumber(raw.amount),
+    createdAt: raw.createdAt,
+  };
+}
+
 export function mapOrder(raw: {
   id: number;
   status: string;
   totalAmount: unknown;
   createdAt: string;
   items: Parameters<typeof mapOrderItem>[0][];
+  shippingAddress?: Parameters<typeof mapShippingAddress>[0];
+  address?: Parameters<typeof mapShippingAddress>[0];
+  payments?: {
+    id: number;
+    method: string;
+    status: string;
+    amount: unknown;
+    createdAt: string;
+  }[];
 }): Order {
   return {
     id: raw.id,
     status: raw.status,
     total: toNumber(raw.totalAmount),
     items: raw.items.map(mapOrderItem),
+    createdAt: raw.createdAt,
+    shippingAddress:
+      mapShippingAddress(raw.shippingAddress) ??
+      mapShippingAddress(raw.address),
+    payments: raw.payments?.map(mapOrderPayment),
+  };
+}
+
+function resolveDisplayName(raw: {
+  name?: string | null;
+  email: string;
+}): string {
+  const trimmed = raw.name?.trim();
+  if (trimmed) return trimmed;
+  return raw.email.split('@')[0];
+}
+
+export function mapUserProfile(raw: {
+  id: number;
+  email: string;
+  name?: string | null;
+  role: string;
+  tenantId?: number;
+  createdAt?: string;
+}): UserProfile {
+  return {
+    id: raw.id,
+    email: raw.email,
+    name: resolveDisplayName(raw),
+    role: raw.role,
+    tenantId: raw.tenantId,
     createdAt: raw.createdAt,
   };
 }
@@ -150,12 +241,14 @@ export function mapReview(raw: {
   productId: number;
   rating: number;
   comment: string | null;
-  user?: { id: number; email: string } | null;
+  user?: { id: number; email: string; name?: string | null } | null;
+  product?: { id: number; name: string } | null;
+  createdAt?: string;
 }): Review {
   const user: User | null = raw.user
     ? {
         id: raw.user.id,
-        name: raw.user.email.split('@')[0],
+        name: resolveDisplayName(raw.user),
         email: raw.user.email,
         role: 'CUSTOMER',
       }
@@ -168,6 +261,7 @@ export function mapReview(raw: {
     rating: raw.rating,
     comment: raw.comment,
     user,
-    createdAt: '',
+    product: raw.product ?? null,
+    createdAt: raw.createdAt ?? '',
   };
 }

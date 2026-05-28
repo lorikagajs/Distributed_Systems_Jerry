@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { getApiErrorMessage, loginUser } from '../api/auth';
+import { getMyProfile } from '../api/users';
+import { isAdminRole } from '../constants/roles';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { useTenantNavigate, useTenantPath } from '../hooks/useTenantNavigate';
@@ -27,9 +29,28 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const data = await loginUser(email, password);
+      const data = await loginUser(email, password, tenant?.tenantId);
       login({ token: data.access_token, user: null });
-      tenantNavigate('/');
+      let redirectTo = '/';
+      try {
+        const profile = await getMyProfile();
+        login({
+          token: data.access_token,
+          user: {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            tenantId: profile.tenantId,
+          },
+        });
+        if (isAdminRole(profile.role)) {
+          redirectTo = '/admin';
+        }
+      } catch {
+        // Profile loads on next visit; cart count still refreshes via CartContext
+      }
+      tenantNavigate(redirectTo);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Invalid email or password.'));
     } finally {

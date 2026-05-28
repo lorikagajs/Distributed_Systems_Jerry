@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  tenantId?: number;
 }
 
 export interface Category {
@@ -50,12 +51,38 @@ export interface OrderItem {
   price: number;
 }
 
+export interface ShippingAddress {
+  line1: string;
+  line2?: string | null;
+  city: string;
+  state?: string | null;
+  postalCode: string;
+  country: string;
+}
+
+export type PaymentMethod =
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'PAYPAL'
+  | 'BANK_TRANSFER'
+  | 'CASH_ON_DELIVERY';
+
+export interface OrderPayment {
+  id: number;
+  method: PaymentMethod;
+  status: string;
+  amount: number;
+  createdAt: string;
+}
+
 export interface Order {
   id: number;
   status: string;
   total: number;
   items: OrderItem[];
   createdAt: string;
+  shippingAddress?: ShippingAddress | null;
+  payments?: OrderPayment[];
 }
 
 export interface Review {
@@ -65,5 +92,15 @@ export interface Review {
   rating: number;
   comment: string | null;
   user: User | null;
+  product?: { id: number; name: string } | null;
   createdAt: string;
+}
+
+export interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  tenantId?: number;
+  createdAt?: string;
 }

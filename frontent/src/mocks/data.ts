@@ -11,6 +11,8 @@ export const MOCK_TENANT_LIST: TenantListItem[] = [
     storeName: 'Nike Official Outlet',
     storeDescription:
       'Just Do It. Shop the latest Nike sneakers and apparel.',
+    logoUrl:
+      'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg',
     primaryColor: '#e11d48',
     secondaryColor: '#be123c',
     bannerUrl:
@@ -21,6 +23,8 @@ export const MOCK_TENANT_LIST: TenantListItem[] = [
     storeName: 'Adidas Zone',
     storeDescription:
       'Impossible is nothing. Explore the 3-stripes collection.',
+    logoUrl:
+      'https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg',
     primaryColor: '#0369a1',
     secondaryColor: '#075985',
     bannerUrl:

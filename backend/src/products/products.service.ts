@@ -11,14 +11,19 @@ import { Prisma } from '@prisma/client';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { ProductQueryDto } from './dto/product-query.dto';
+import { ProductQueryDto, ProductSortOption } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PRODUCTS_LIST_CACHE_PREFIX } from './products-cache.constants';
 
 const productInclude = {
   category: true,
   images: { orderBy: { createdAt: 'asc' as const } },
+  reviews: { select: { rating: true } },
 };
+
+type ProductWithRelations = Prisma.ProductGetPayload<{
+  include: typeof productInclude;
+}>;
 
 @Injectable()
 export class ProductsService {
@@ -28,14 +33,18 @@ export class ProductsService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  findAll(tenantId: number, query: ProductQueryDto) {
+  async findAll(tenantId: number, query: ProductQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
+    const nameFilter = query.search?.trim() || query.name?.trim();
+
     const where: Prisma.ProductWhereInput = { tenantId };
 
-    if (query.name) {
-      where.name = { contains: query.name, mode: 'insensitive' };
+    if (nameFilter) {
+      where.name = { contains: nameFilter, mode: 'insensitive' };
     }
-    if (query.categoryId !== undefined) {
-      where.categoryId = query.categoryId;
+    if (query.categoryId?.length) {
+      where.categoryId = { in: query.categoryId };
     }
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.price = {};
@@ -47,11 +56,36 @@ export class ProductsService {
       }
     }
 
-    return this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where,
       include: productInclude,
-      orderBy: { name: 'asc' },
     });
+
+    let enriched = products.map((product) => this.withAverageRating(product));
+
+    if (query.minRating !== undefined) {
+      enriched = enriched.filter(
+        (product) =>
+          product.averageRating != null &&
+          product.averageRating >= query.minRating!,
+      );
+    }
+
+    enriched = this.sortProducts(enriched, query.sort ?? ProductSortOption.NEWEST);
+
+    const total = enriched.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const skip = (safePage - 1) * limit;
+    const data = enriched.slice(skip, skip + limit);
+
+    return {
+      data,
+      total,
+      page: safePage,
+      limit,
+      totalPages,
+    };
   }
 
   async findOne(tenantId: number, id: number) {
@@ -62,12 +96,12 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product with id ${id} not found`);
     }
-    return product;
+    return this.withAverageRating(product);
   }
 
   async create(tenantId: number, dto: CreateProductDto) {
     await this.ensureCategoryInTenant(tenantId, dto.categoryId);
-    const product = await this.prisma.product.create({
+    const created = await this.prisma.product.create({
       data: {
         name: dto.name,
         description: dto.description,
@@ -83,7 +117,7 @@ export class ProductsService {
       include: productInclude,
     });
     await this.invalidateProductsListCache(tenantId);
-    return product;
+    return this.withAverageRating(created);
   }
 
   async update(tenantId: number, id: number, dto: UpdateProductDto) {
@@ -91,7 +125,7 @@ export class ProductsService {
     if (dto.categoryId !== undefined) {
       await this.ensureCategoryInTenant(tenantId, dto.categoryId);
     }
-    const product = await this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: {
         name: dto.name,
@@ -104,42 +138,51 @@ export class ProductsService {
       include: productInclude,
     });
     await this.invalidateProductsListCache(tenantId);
-    return product;
+    return this.withAverageRating(updated);
+  }
+  
+  async uploadImage(
+  tenantId: number,
+  productId: number,
+  file?: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('Image file is required');
   }
 
-  async uploadImage(
-    tenantId: number,
-    productId: number,
-    file?: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Image file is required');
+  await this.findOne(tenantId, productId);
+
+  const imageUrl = await this.cloudinaryService.uploadImage(file);
+
+  const result = await this.prisma.$transaction(async (tx) => {
+    await tx.productImage.create({
+      data: { productId, url: imageUrl },
+    });
+
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product?.imageUrl) {
+      await tx.product.update({
+        where: { id: productId },
+        data: { imageUrl },
+      });
     }
 
-    await this.findOne(tenantId, productId);
-    const imageUrl = await this.cloudinaryService.uploadImage(file);
-
-    return this.prisma.$transaction(async (tx) => {
-      await tx.productImage.create({
-        data: { productId, url: imageUrl },
-      });
-
-      const product = await tx.product.findUnique({ where: { id: productId } });
-
-      if (!product?.imageUrl) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { imageUrl },
-        });
-      }
-
-      return tx.product.findUniqueOrThrow({
-        where: { id: productId },
-        include: productInclude,
-      });
+    const updatedProduct = await tx.product.findUniqueOrThrow({
+      where: { id: productId },
+      include: productInclude,
     });
-  }
 
+    return this.withAverageRating(updatedProduct);
+  });
+
+  await this.invalidateProductsListCache(tenantId);
+
+  return result;
+}
+  
   async remove(tenantId: number, id: number) {
     await this.findOne(tenantId, id);
     const deleted = await this.prisma.product.delete({ where: { id } });
@@ -175,6 +218,51 @@ export class ProductsService {
       }
     }
     return null;
+  }
+
+  private withAverageRating(product: ProductWithRelations) {
+    const { reviews, ...rest } = product;
+    const reviewCount = reviews.length;
+    const averageRating =
+      reviewCount > 0
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount
+        : null;
+
+    return {
+      ...rest,
+      averageRating,
+      reviewCount,
+    };
+  }
+
+  private sortProducts(
+    products: ReturnType<ProductsService['withAverageRating']>[],
+    sort: ProductSortOption,
+  ) {
+    const sorted = [...products];
+
+    switch (sort) {
+      case ProductSortOption.PRICE_ASC:
+        sorted.sort((a, b) => Number(a.price) - Number(b.price));
+        break;
+      case ProductSortOption.PRICE_DESC:
+        sorted.sort((a, b) => Number(b.price) - Number(a.price));
+        break;
+      case ProductSortOption.POPULAR:
+        sorted.sort((a, b) => {
+          if (b.reviewCount !== a.reviewCount) {
+            return b.reviewCount - a.reviewCount;
+          }
+          return (b.averageRating ?? 0) - (a.averageRating ?? 0);
+        });
+        break;
+      case ProductSortOption.NEWEST:
+      default:
+        sorted.sort((a, b) => b.id - a.id);
+        break;
+    }
+
+    return sorted;
   }
 
   private async ensureCategoryInTenant(tenantId: number, categoryId: number) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   ImageOff,
   Loader2,
@@ -14,11 +14,12 @@ import {
   removeCartItem,
   updateCartItem,
 } from '../api/cart';
-import { createOrder } from '../api/orders';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { EmptyState } from '../components/ui/EmptyState';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
-import { useAuth } from '../context/AuthContext';
-import { useTenantNavigate, useTenantPath } from '../hooks/useTenantNavigate';
+import { useCart } from '../context/CartContext';
+import { useTenantPath } from '../hooks/useTenantNavigate';
 import type { Cart, CartItem } from '../types';
 
 const FREE_SHIPPING_THRESHOLD = 50;
@@ -40,17 +41,20 @@ function getSubtotal(items: CartItem[]) {
   return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
+type ConfirmAction = 'clear' | 'remove';
+
 export function CartPage() {
-  const { token } = useAuth();
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const tenantPath = useTenantPath();
-  const tenantNavigate = useTenantNavigate();
   const { showToast } = useToast();
+  const { syncCartCount, clearCartContext } = useCart();
 
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [clearing, setClearing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+    null,
+  );
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
 
   const loadCart = useCallback(async () => {
@@ -58,26 +62,29 @@ export function CartPage() {
     try {
       const data = await getCart();
       setCart(data);
+      syncCartCount(data);
     } catch {
       showToast('error', 'Failed to load your cart.');
       setCart({ id: 0, items: [], total: 0 });
+      clearCartContext();
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, syncCartCount, clearCartContext]);
 
   useEffect(() => {
-    if (token) {
-      void loadCart();
-    }
-  }, [token, loadCart]);
+    void loadCart();
+  }, [loadCart]);
 
   const subtotal = useMemo(
     () => (cart ? getSubtotal(cart.items) : 0),
     [cart],
   );
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_COST;
+  const shipping =
+    subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_COST;
   const orderTotal = subtotal + shipping;
+
+  const pendingRemoveItem = cart?.items.find((i) => i.id === pendingRemoveId);
 
   const handleQuantityChange = async (item: CartItem, delta: number) => {
     if (!cart) return;
@@ -98,6 +105,7 @@ export function CartPage() {
     try {
       const updated = await updateCartItem(item.id, newQty);
       setCart(updated);
+      syncCartCount(updated);
     } catch {
       setCart(previous);
       showToast('error', 'Could not update quantity.');
@@ -106,7 +114,7 @@ export function CartPage() {
     }
   };
 
-  const handleRemove = async (itemId: number) => {
+  const executeRemove = async (itemId: number) => {
     if (!cart) return;
 
     const previous = cart;
@@ -121,6 +129,7 @@ export function CartPage() {
     try {
       const updated = await removeCartItem(itemId);
       setCart(updated);
+      syncCartCount(updated);
       showToast('success', 'Item removed from cart');
     } catch {
       setCart(previous);
@@ -128,48 +137,40 @@ export function CartPage() {
     }
   };
 
-  const handleClearCart = async () => {
+  const executeClearCart = async () => {
     if (!cart || cart.items.length === 0) return;
 
     const previous = cart;
-    setClearing(true);
     setCart({ ...cart, items: [], total: 0 });
 
     try {
       const updated = await clearCart();
       setCart(updated);
+      clearCartContext();
       showToast('success', 'Cart cleared');
     } catch {
       setCart(previous);
+      syncCartCount(previous);
       showToast('error', 'Could not clear cart.');
-    } finally {
-      setClearing(false);
     }
   };
 
-  const handleCheckout = async () => {
-    if (!cart || cart.items.length === 0) return;
+  const handleConfirm = async () => {
+    if (!confirmAction) return;
 
-    setCheckingOut(true);
+    setConfirmLoading(true);
     try {
-      const items = cart.items.map((i) => ({
-        productId: i.productId,
-        quantity: i.quantity,
-      }));
-      await createOrder(items);
-      setCart({ id: cart.id, items: [], total: 0 });
-      showToast('success', 'Order placed successfully!');
-      tenantNavigate('/orders');
-    } catch {
-      showToast('error', 'Checkout failed. Please try again.');
+      if (confirmAction === 'clear') {
+        await executeClearCart();
+      } else if (pendingRemoveId != null) {
+        await executeRemove(pendingRemoveId);
+      }
     } finally {
-      setCheckingOut(false);
+      setConfirmLoading(false);
+      setConfirmAction(null);
+      setPendingRemoveId(null);
     }
   };
-
-  if (!token) {
-    return <Navigate to={`/${tenantSlug}/login`} replace />;
-  }
 
   if (loading) {
     return <LoadingSpinner label="Loading cart" />;
@@ -179,24 +180,12 @@ export function CartPage() {
 
   if (isEmpty) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="flex size-24 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-          <ShoppingBag className="size-12" aria-hidden />
-        </div>
-        <h1 className="mt-6 text-2xl font-bold text-gray-900">
-          Your cart is empty
-        </h1>
-        <p className="mt-2 max-w-sm text-gray-600">
-          Looks like you haven&apos;t added anything yet. Explore our products
-          and find something you love.
-        </p>
-        <Link
-          to={tenantPath('/products')}
-          className="mt-8 rounded-lg bg-[var(--color-primary)] px-8 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
-          Start Shopping
-        </Link>
-      </div>
+      <EmptyState
+        icon={ShoppingBag}
+        title="Your cart is empty"
+        description="Looks like you haven't added anything yet. Explore our products and find something you love."
+        action={{ type: 'link', label: 'Start Shopping', to: tenantPath('/products') }}
+      />
     );
   }
 
@@ -207,7 +196,7 @@ export function CartPage() {
         {cart.items.length} item{cart.items.length !== 1 ? 's' : ''} in your cart
       </p>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-3">
+      <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-3 lg:gap-8">
         <div className="lg:col-span-2">
           <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white shadow-sm">
             {cart.items.map((item) => {
@@ -221,7 +210,7 @@ export function CartPage() {
                 >
                   <Link
                     to={tenantPath(`/products/${item.product.id}`)}
-                    className="size-24 shrink-0 overflow-hidden rounded-lg bg-gray-100"
+                    className="mx-auto size-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:mx-0"
                   >
                     {item.product.imageUrl ? (
                       <img
@@ -236,7 +225,7 @@ export function CartPage() {
                     )}
                   </Link>
 
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 text-center sm:text-left">
                     <Link
                       to={tenantPath(`/products/${item.product.id}`)}
                       className="font-medium text-gray-900 hover:text-[var(--color-primary)]"
@@ -247,14 +236,12 @@ export function CartPage() {
                       {formatPrice(item.price)} each
                     </p>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-4">
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-4 sm:justify-start">
                       <div className="flex items-center rounded-lg border border-gray-300">
                         <button
                           type="button"
                           onClick={() => handleQuantityChange(item, -1)}
-                          disabled={
-                            isUpdating || item.quantity <= 1
-                          }
+                          disabled={isUpdating || item.quantity <= 1}
                           className="p-2 hover:bg-gray-50 disabled:opacity-50"
                           aria-label="Decrease quantity"
                         >
@@ -288,8 +275,11 @@ export function CartPage() {
 
                   <button
                     type="button"
-                    onClick={() => handleRemove(item.id)}
-                    className="self-start rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 sm:self-center"
+                    onClick={() => {
+                      setPendingRemoveId(item.id);
+                      setConfirmAction('remove');
+                    }}
+                    className="self-center rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
                     aria-label={`Remove ${item.product.name}`}
                   >
                     <X className="size-5" />
@@ -301,70 +291,95 @@ export function CartPage() {
 
           <button
             type="button"
-            onClick={handleClearCart}
-            disabled={clearing}
-            className="mt-4 text-sm font-medium text-red-600 transition-colors hover:text-red-700 disabled:opacity-50"
+            onClick={() => setConfirmAction('clear')}
+            className="mt-4 text-sm font-medium text-red-600 transition-colors hover:text-red-700"
           >
-            {clearing ? 'Clearing…' : 'Clear Cart'}
+            Clear Cart
           </button>
         </div>
 
         <div className="lg:col-span-1">
-          <div className="sticky top-24 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
+          <div className="lg:sticky lg:top-24">
+            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
 
-            <dl className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Subtotal</dt>
-                <dd className="font-medium text-gray-900">
-                  {formatPrice(subtotal)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-600">Shipping</dt>
-                <dd className="font-medium text-gray-900">
-                  {shipping === 0 ? (
-                    <span className="text-green-600">Free</span>
-                  ) : (
-                    formatPrice(shipping)
-                  )}
-                </dd>
-              </div>
-              {subtotal > 0 && subtotal < FREE_SHIPPING_THRESHOLD && (
-                <p className="text-xs text-gray-500">
-                  Add {formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)} more for
-                  free shipping
-                </p>
-              )}
-              <div className="flex justify-between border-t border-gray-200 pt-3 text-base">
-                <dt className="font-semibold text-gray-900">Total</dt>
-                <dd className="font-bold text-gray-900">
-                  {formatPrice(orderTotal)}
-                </dd>
-              </div>
-            </dl>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-gray-600">Subtotal</dt>
+                  <dd className="font-medium text-gray-900">
+                    {formatPrice(subtotal)}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-600">Shipping</dt>
+                  <dd className="font-medium text-gray-900">
+                    {shipping === 0 ? (
+                      <span className="text-green-600">Free</span>
+                    ) : (
+                      formatPrice(shipping)
+                    )}
+                  </dd>
+                </div>
+                {subtotal > 0 && subtotal < FREE_SHIPPING_THRESHOLD && (
+                  <p className="text-xs text-gray-500">
+                    Add {formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)} more
+                    for free shipping
+                  </p>
+                )}
+                <div className="flex justify-between border-t border-gray-200 pt-3 text-base">
+                  <dt className="font-semibold text-gray-900">Total</dt>
+                  <dd className="font-bold text-gray-900">
+                    {formatPrice(orderTotal)}
+                  </dd>
+                </div>
+              </dl>
 
-            <button
-              type="button"
-              onClick={handleCheckout}
-              disabled={checkingOut}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-70"
-            >
-              {checkingOut && (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              )}
-              Proceed to Checkout
-            </button>
+              <Link
+                to={tenantPath('/checkout')}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Proceed to Checkout
+              </Link>
 
-            <Link
-              to={tenantPath('/products')}
-              className="mt-4 block text-center text-sm font-medium text-[var(--color-primary)] hover:underline"
-            >
-              Continue Shopping
-            </Link>
+              <Link
+                to={tenantPath('/products')}
+                className="mt-4 block text-center text-sm font-medium text-[var(--color-primary)] hover:underline"
+              >
+                Continue Shopping
+              </Link>
+            </div>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmAction === 'clear'}
+        title="Clear cart?"
+        message="Remove all items from your cart. This cannot be undone."
+        confirmLabel="Clear cart"
+        variant="danger"
+        loading={confirmLoading}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmModal
+        open={confirmAction === 'remove' && pendingRemoveId != null}
+        title="Remove item?"
+        message={
+          pendingRemoveItem
+            ? `Remove "${pendingRemoveItem.product.name}" from your cart?`
+            : 'Remove this item from your cart?'
+        }
+        confirmLabel="Remove"
+        variant="danger"
+        loading={confirmLoading}
+        onConfirm={handleConfirm}
+        onCancel={() => {
+          setConfirmAction(null);
+          setPendingRemoveId(null);
+        }}
+      />
     </div>
   );
 }

@@ -2,8 +2,11 @@ import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageOff, Loader2, ShoppingCart } from 'lucide-react';
+import { getApiErrorMessage } from '../../api/auth';
 import { addToCart } from '../../api/cart';
+import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { useTenantPath, useTenantNavigate } from '../../hooks/useTenantNavigate';
 import type { Product } from '../../types';
 import { StarRating } from '../ui/StarRating';
@@ -18,6 +21,8 @@ function formatPrice(price: number) {
 
 export function ProductCard({ product }: ProductCardProps) {
   const { token } = useAuth();
+  const { syncCartCount } = useCart();
+  const { showToast } = useToast();
   const tenantPath = useTenantPath();
   const tenantNavigate = useTenantNavigate();
   const [adding, setAdding] = useState(false);
@@ -28,17 +33,20 @@ export function ProductCard({ product }: ProductCardProps) {
     e.stopPropagation();
 
     if (!token) {
-      tenantNavigate('/login');
+      tenantNavigate('/login', {
+        state: { message: 'Please login to add items to your cart' },
+      });
       return;
     }
 
     setAdding(true);
     try {
-      await addToCart(product.id, 1);
+      const cart = await addToCart(product.id, 1);
+      syncCartCount(cart);
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
-    } catch {
-      // Cart errors surfaced on cart page later
+    } catch (err) {
+      showToast('error', getApiErrorMessage(err, 'Could not add to cart.'));
     } finally {
       setAdding(false);
     }

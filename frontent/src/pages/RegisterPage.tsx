@@ -49,8 +49,17 @@ export function RegisterPage() {
 
     try {
       const { user } = await registerUser(name.trim(), email, password, tenantId);
-      const { access_token } = await loginUser(email, password);
-      login({ token: access_token, user: { ...user, name: name.trim() } });
+      const { access_token } = await loginUser(email, password, tenantId);
+      login({
+        token: access_token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? name.trim(),
+          role: user.role,
+          tenantId: user.tenantId,
+        },
+      });
       tenantNavigate('/');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Registration failed. Please try again.'));

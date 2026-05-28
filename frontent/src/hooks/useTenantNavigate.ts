@@ -1,17 +1,17 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, type NavigateOptions } from 'react-router-dom';
 import { useTenant } from '../context/TenantContext';
 
 export function useTenantNavigate() {
   const { slug } = useTenant();
   const navigate = useNavigate();
 
-  return (path: string) => {
+  return (path: string, options?: NavigateOptions) => {
     if (!slug) {
-      navigate(path);
+      navigate(path, options);
       return;
     }
     const normalized = path.startsWith('/') ? path : `/${path}`;
-    navigate(`/${slug}${normalized}`);
+    navigate(`/${slug}${normalized}`, options);
   };
 }
 

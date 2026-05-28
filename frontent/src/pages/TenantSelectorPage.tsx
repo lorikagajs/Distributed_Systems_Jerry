@@ -33,9 +33,13 @@ export function TenantSelectorPage() {
           <p className="mt-2 text-gray-600">
             Choose a store to start shopping
           </p>
-          {isMockMode() && (
+          {isMockMode() ? (
             <p className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
               Demo mode — using mock data (no backend required)
+            </p>
+          ) : (
+            <p className="mt-2 inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
+              Connected to API — run backend seed, then log in per store
             </p>
           )}
         </div>
@@ -83,9 +87,26 @@ export function TenantSelectorPage() {
                   )}
                 </div>
                 <div className="p-5">
-                  <h2 className="text-lg font-semibold text-gray-900 group-hover:text-[var(--color-primary)]">
-                    {store.storeName}
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    {store.logoUrl ? (
+                      <span
+                        className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full ring-2"
+                        style={{
+                          backgroundColor: 'white',
+                          borderColor: store.primaryColor,
+                        }}
+                      >
+                        <img
+                          src={store.logoUrl}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      </span>
+                    ) : null}
+                    <h2 className="text-lg font-semibold text-gray-900 group-hover:text-[var(--color-primary)]">
+                      {store.storeName}
+                    </h2>
+                  </div>
                   {store.storeDescription && (
                     <p className="mt-2 line-clamp-2 text-sm text-gray-600">
                       {store.storeDescription}

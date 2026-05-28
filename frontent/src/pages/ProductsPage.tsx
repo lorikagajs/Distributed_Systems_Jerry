@@ -9,7 +9,9 @@ import {
 } from '../api/products';
 import { ProductCard } from '../components/products/ProductCard';
 import { ProductFiltersPanel } from '../components/products/ProductFiltersPanel';
-import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { ProductCardSkeleton } from '../components/ui/ProductCardSkeleton';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Package } from 'lucide-react';
 import { useTenant } from '../context/TenantContext';
 import type { Category, Product } from '../types';
 
@@ -99,6 +101,26 @@ export function ProductsPage() {
     if (!tenant?.tenantId) return;
     getCategories().then(setCategories).catch(() => setCategories([]));
   }, [tenant?.tenantId]);
+
+  // Legacy navbar links used ?category=Name — map to categoryId once categories load
+  useEffect(() => {
+    const legacyCategory = searchParams.get('category');
+    if (!legacyCategory || categories.length === 0) return;
+    if (searchParams.getAll('categoryId').length > 0) return;
+
+    const match = categories.find(
+      (c) => c.name.toLowerCase() === legacyCategory.toLowerCase(),
+    );
+    if (!match) return;
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('category');
+      next.append('categoryId', String(match.id));
+      next.set('page', '1');
+      return next;
+    });
+  }, [categories, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!tenant?.tenantId) return;
@@ -240,13 +262,31 @@ export function ProductsPage() {
           )}
 
           {loading ? (
-            <LoadingSpinner label="Loading products" />
+            <ul
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4"
+              aria-busy="true"
+              aria-label="Loading products"
+            >
+              {Array.from({ length: PRODUCTS_PAGE_SIZE }, (_, i) => (
+                <li key={i}>
+                  <ProductCardSkeleton />
+                </li>
+              ))}
+            </ul>
           ) : products.length === 0 ? (
-            <p className="py-16 text-center text-gray-500">
-              No products match your filters.
-            </p>
+            <EmptyState
+              icon={Package}
+              title="No products found"
+              description="Try adjusting your filters or search terms to find what you're looking for."
+              action={{
+                type: 'button',
+                label: 'Clear filters',
+                onClick: handleClearFilters,
+              }}
+              compact
+            />
           ) : (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
                 <li key={product.id}>
                   <ProductCard product={product} />

@@ -50,6 +50,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
+        name: dto.name?.trim() || null,
         password: hashedPassword,
         tenantId: dto.tenantId,
         role: dto.role ?? UserRole.CUSTOMER,
@@ -61,8 +62,13 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const whereClause: { email: string; tenantId?: number } = { email: dto.email };
+    if (dto.tenantId != null) {
+      whereClause.tenantId = dto.tenantId;
+    }
+
     const users = await this.prisma.user.findMany({
-      where: { email: dto.email },
+      where: whereClause,
     });
 
     let authenticatedUser: User | null = null;
@@ -159,6 +165,7 @@ export class AuthService {
     return {
       id: true,
       email: true,
+      name: true,
       role: true,
       tenantId: true,
       createdAt: true,

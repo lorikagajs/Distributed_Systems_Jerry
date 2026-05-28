@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { CreateOrderPaymentDto } from './create-order-payment.dto';
+import { ShippingAddressDto } from './shipping-address.dto';
 
 export class CreateOrderItemDto {
   @ApiProperty({ example: 1 })
@@ -22,4 +30,14 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items!: CreateOrderItemDto[];
+
+  @ApiProperty({ type: ShippingAddressDto })
+  @ValidateNested()
+  @Type(() => ShippingAddressDto)
+  shipping!: ShippingAddressDto;
+
+  @ApiProperty({ type: CreateOrderPaymentDto })
+  @ValidateNested()
+  @Type(() => CreateOrderPaymentDto)
+  payment!: CreateOrderPaymentDto;
 }

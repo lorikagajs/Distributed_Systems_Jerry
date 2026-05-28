@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { getApiBaseUrl } from '../config/env';
 
 /** Paths that must not receive an automatic tenantId query param */
-const SKIP_TENANT_QUERY_PREFIXES = ['/tenants', '/auth'];
+const SKIP_TENANT_QUERY_PREFIXES = ['/tenants', '/auth', '/cart', '/orders', '/users'];
 
 let currentTenantId: number | null = null;
 
@@ -14,7 +15,10 @@ export function getTenantId() {
 }
 
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: getApiBaseUrl(),
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 axiosInstance.interceptors.request.use((config) => {
@@ -37,5 +41,21 @@ axiosInstance.interceptors.request.use((config) => {
 
   return config;
 });
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const url = error.config?.url ?? '';
+      const isAuthRoute =
+        url.startsWith('/auth/login') || url.startsWith('/auth/register');
+      if (!isAuthRoute && localStorage.getItem('token')) {
+        localStorage.removeItem('token');
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default axiosInstance;

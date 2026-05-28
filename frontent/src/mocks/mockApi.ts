@@ -1,12 +1,15 @@
 import axios from 'axios';
+import type { CreateOrderInput } from '../api/orders';
 import type {
   TenantConfig,
   TenantListItem,
 } from '../api/tenants';
 import type {
+  CreateProductPayload,
   GetProductsParams,
   PaginatedProducts,
   ProductSort,
+  UpdateProductPayload,
 } from '../api/products';
 import { PRODUCTS_PAGE_SIZE } from '../api/products';
 import { getTenantId } from '../api/axiosInstance';
@@ -17,12 +20,40 @@ import {
   MOCK_TENANT_CONFIGS,
   MOCK_TENANT_LIST,
 } from './data';
-import type { Cart, CartItem, Category, Order, Product, Review } from '../types';
+import type {
+  Cart,
+  CartItem,
+  Category,
+  Order,
+  Product,
+  Review,
+  UserProfile,
+} from '../types';
 
 const delay = (ms = 300) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const mockProductsStore: Record<number, Product[]> = {};
+
+function getMockProductsForTenant(tenantId: number): Product[] {
+  if (!mockProductsStore[tenantId]) {
+    mockProductsStore[tenantId] = (MOCK_PRODUCTS[tenantId] ?? []).map((p) => ({
+      ...p,
+    }));
+  }
+  return mockProductsStore[tenantId];
+}
+
 const mockCartsByTenant: Record<number, Cart> = {};
+const mockOrdersByTenant: Record<number, Order[]> = {};
+const mockProfilesByTenant: Record<number, UserProfile> = {};
+
+const MOCK_DEFAULT_PROFILE: UserProfile = {
+  id: 99,
+  name: 'Demo User',
+  email: 'demo@example.com',
+  role: 'CUSTOMER',
+};
 
 function recalcCartTotal(cart: Cart): Cart {
   const total = cart.items.reduce(
@@ -108,7 +139,7 @@ export async function mockGetProducts(
     };
   }
 
-  let items = [...(MOCK_PRODUCTS[tenantId] ?? [])];
+  let items = [...getMockProductsForTenant(tenantId)];
 
   if (params?.search) {
     const q = params.search.toLowerCase();
@@ -147,11 +178,134 @@ export async function mockGetProducts(
 export async function mockGetProductById(id: number): Promise<Product> {
   await delay(200);
   const tenantId = getTenantId();
-  const product = MOCK_PRODUCTS[tenantId ?? 0]?.find((p) => p.id === id);
+  const product = getMockProductsForTenant(tenantId ?? 0).find((p) => p.id === id);
   if (!product) {
     throw new axios.AxiosError('Product not found', 'ERR_NOT_FOUND');
   }
   return product;
+}
+
+export async function mockCreateProduct(
+  payload: CreateProductPayload,
+): Promise<Product> {
+  await delay(300);
+  const tenantId = getTenantId();
+  if (!tenantId) {
+    throw new axios.AxiosError('Tenant required', 'ERR_BAD_REQUEST');
+  }
+
+  const categories = MOCK_CATEGORIES[tenantId] ?? [];
+  const category = categories.find((c) => c.id === payload.categoryId);
+  if (!category) {
+    throw new axios.AxiosError('Category not found', 'ERR_NOT_FOUND');
+  }
+
+  const products = getMockProductsForTenant(tenantId);
+  const nextId =
+    products.reduce((max, p) => Math.max(max, p.id), tenantId * 100) + 1;
+
+  const product: Product = {
+    id: nextId,
+    name: payload.name,
+    description: payload.description ?? null,
+    price: payload.price,
+    stock: payload.stock,
+    categoryId: payload.categoryId,
+    tenantId,
+    imageUrl: payload.imageUrl ?? null,
+    images: payload.imageUrl ? [payload.imageUrl] : [],
+    category,
+    ratings: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  products.unshift(product);
+  return product;
+}
+
+export async function mockUpdateProduct(
+  id: number,
+  payload: UpdateProductPayload,
+): Promise<Product> {
+  await delay(300);
+  const tenantId = getTenantId();
+  if (!tenantId) {
+    throw new axios.AxiosError('Tenant required', 'ERR_BAD_REQUEST');
+  }
+
+  const products = getMockProductsForTenant(tenantId);
+  const index = products.findIndex((p) => p.id === id);
+  if (index === -1) {
+    throw new axios.AxiosError('Product not found', 'ERR_NOT_FOUND');
+  }
+
+  const current = products[index];
+  const categories = MOCK_CATEGORIES[tenantId] ?? [];
+  const categoryId = payload.categoryId ?? current.categoryId;
+  const category =
+    categories.find((c) => c.id === categoryId) ?? current.category;
+
+  const imageUrl =
+    payload.imageUrl !== undefined ? payload.imageUrl : current.imageUrl;
+
+  const updated: Product = {
+    ...current,
+    ...payload,
+    categoryId,
+    category,
+    imageUrl,
+    images:
+      imageUrl != null
+        ? [imageUrl, ...current.images.filter((u) => u !== imageUrl)]
+        : current.images,
+  };
+
+  products[index] = updated;
+  return updated;
+}
+
+export async function mockDeleteProduct(id: number): Promise<void> {
+  await delay(300);
+  const tenantId = getTenantId();
+  if (!tenantId) return;
+
+  const products = getMockProductsForTenant(tenantId);
+  const index = products.findIndex((p) => p.id === id);
+  if (index === -1) {
+    throw new axios.AxiosError('Product not found', 'ERR_NOT_FOUND');
+  }
+  products.splice(index, 1);
+}
+
+export async function mockUploadProductImage(
+  id: number,
+  file: File,
+): Promise<Product> {
+  await delay(400);
+  const objectUrl = URL.createObjectURL(file);
+  const tenantId = getTenantId();
+  if (!tenantId) {
+    throw new axios.AxiosError('Tenant required', 'ERR_BAD_REQUEST');
+  }
+
+  const products = getMockProductsForTenant(tenantId);
+  const index = products.findIndex((p) => p.id === id);
+  if (index === -1) {
+    throw new axios.AxiosError('Product not found', 'ERR_NOT_FOUND');
+  }
+
+  const current = products[index];
+  const imageUrl = current.imageUrl ?? objectUrl;
+  const images = [...current.images, objectUrl];
+
+  const updated: Product = {
+    ...current,
+    imageUrl,
+    images,
+  };
+
+  products[index] = updated;
+  return updated;
 }
 
 export async function mockGetProductReviews(
@@ -172,7 +326,9 @@ export async function mockAddToCart(
 ): Promise<Cart> {
   await delay(200);
   const tenantId = getTenantId();
-  const product = MOCK_PRODUCTS[tenantId ?? 0]?.find((p) => p.id === productId);
+  const product = getMockProductsForTenant(tenantId ?? 0).find(
+    (p) => p.id === productId,
+  );
   if (!product) {
     throw new axios.AxiosError('Product not found', 'ERR_NOT_FOUND');
   }
@@ -237,13 +393,11 @@ export async function mockClearCart(): Promise<Cart> {
   return { ...empty };
 }
 
-export async function mockCreateOrder(
-  items: { productId: number; quantity: number }[],
-): Promise<Order> {
+export async function mockCreateOrder(input: CreateOrderInput): Promise<Order> {
   await delay(400);
   const tenantId = getTenantId() ?? 0;
-  const products = MOCK_PRODUCTS[tenantId] ?? [];
-  const orderItems = items.map((item, index) => {
+  const products = getMockProductsForTenant(tenantId);
+  const orderItems = input.items.map((item, index) => {
     const product = products.find((p) => p.id === item.productId)!;
     return {
       id: Date.now() + index,
@@ -258,13 +412,106 @@ export async function mockCreateOrder(
     0,
   );
   setMockCartStore({ id: 1, items: [], total: 0 });
-  return {
+  const order: Order = {
     id: Math.floor(Date.now() / 1000),
-    status: 'PENDING',
+    status: 'CONFIRMED',
     total,
     items: orderItems,
     createdAt: new Date().toISOString(),
+    shippingAddress: input.shipping,
+    payments: [
+      {
+        id: Date.now(),
+        method: input.payment.method,
+        status: 'COMPLETED',
+        amount: total,
+        createdAt: new Date().toISOString(),
+      },
+    ],
   };
+  if (!mockOrdersByTenant[tenantId]) {
+    mockOrdersByTenant[tenantId] = [];
+  }
+  mockOrdersByTenant[tenantId].unshift(order);
+  return order;
+}
+
+export async function mockGetMyOrders(): Promise<Order[]> {
+  await delay(300);
+  const tenantId = getTenantId() ?? 0;
+  return [...(mockOrdersByTenant[tenantId] ?? [])];
+}
+
+export async function mockGetOrderById(id: number): Promise<Order> {
+  await delay(300);
+  const tenantId = getTenantId() ?? 0;
+  const order = (mockOrdersByTenant[tenantId] ?? []).find((o) => o.id === id);
+  if (!order) {
+    throw new Error('Order not found');
+  }
+  return { ...order };
+}
+
+function getMockProfileStore(): UserProfile {
+  const tenantId = getTenantId() ?? 0;
+  if (!mockProfilesByTenant[tenantId]) {
+    mockProfilesByTenant[tenantId] = { ...MOCK_DEFAULT_PROFILE };
+  }
+  return mockProfilesByTenant[tenantId];
+}
+
+export async function mockGetMyProfile(): Promise<UserProfile> {
+  await delay(200);
+  return { ...getMockProfileStore() };
+}
+
+export async function mockUpdateProfile(name: string): Promise<UserProfile> {
+  await delay(300);
+  const profile = getMockProfileStore();
+  profile.name = name.trim();
+  return { ...profile };
+}
+
+export async function mockChangePassword(
+  currentPassword: string,
+  _newPassword: string,
+): Promise<void> {
+  await delay(300);
+  if (currentPassword.length < 8) {
+    throw new Error('Current password is incorrect');
+  }
+}
+
+export async function mockDeleteAccount(): Promise<void> {
+  await delay(400);
+  const tenantId = getTenantId() ?? 0;
+  delete mockProfilesByTenant[tenantId];
+  mockOrdersByTenant[tenantId] = [];
+  setMockCartStore({ id: 1, items: [], total: 0 });
+}
+
+export async function mockGetMyReviews(): Promise<Review[]> {
+  await delay(300);
+  const tenantId = getTenantId() ?? 0;
+  const products = getMockProductsForTenant(tenantId);
+  const reviews: Review[] = [];
+
+  for (const [productIdStr, productReviews] of Object.entries(MOCK_REVIEWS)) {
+    const productId = Number(productIdStr);
+    const product = products.find((p) => p.id === productId);
+    for (const review of productReviews) {
+      if (review.userId === MOCK_DEFAULT_PROFILE.id) {
+        reviews.push({
+          ...review,
+          product: product
+            ? { id: product.id, name: product.name }
+            : { id: productId, name: `Product #${productId}` },
+        });
+      }
+    }
+  }
+
+  return reviews.sort((a, b) => b.id - a.id);
 }
 
 export async function mockAddReview(

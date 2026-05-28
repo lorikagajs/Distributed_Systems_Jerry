@@ -4,6 +4,7 @@ import axiosInstance from './axiosInstance';
 export interface AuthUser {
   id: number;
   email: string;
+  name?: string | null;
   role: string;
   tenantId: number;
   createdAt: string;
@@ -20,16 +21,18 @@ export interface RegisterResponse {
 export async function loginUser(
   email: string,
   password: string,
+  tenantId?: number,
 ): Promise<LoginResponse> {
   const { data } = await axiosInstance.post<LoginResponse>('/auth/login', {
     email,
     password,
+    tenantId,
   });
   return data;
 }
 
 export async function registerUser(
-  _name: string,
+  name: string,
   email: string,
   password: string,
   tenantId: number,
@@ -37,6 +40,7 @@ export async function registerUser(
   const { data } = await axiosInstance.post<RegisterResponse>(
     '/auth/register',
     {
+      name: name.trim(),
       email,
       password,
       tenantId,

@@ -1,10 +1,15 @@
 import axiosInstance from './axiosInstance';
+import { serializeQueryParams } from './queryParams';
 import { isMockMode } from '../config/env';
 import { mapCategory, mapProduct } from './mappers';
 import {
+  mockCreateProduct,
+  mockDeleteProduct,
   mockGetCategories,
   mockGetProductById,
   mockGetProducts,
+  mockUpdateProduct,
+  mockUploadProductImage,
 } from '../mocks/mockApi';
 import type { Category, Product } from '../types';
 
@@ -39,6 +44,17 @@ interface PaginatedProductsResponse {
 
 export const PRODUCTS_PAGE_SIZE = 12;
 
+function isPaginatedResponse(
+  value: unknown,
+): value is PaginatedProductsResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as PaginatedProductsResponse).data) &&
+    typeof (value as PaginatedProductsResponse).total === 'number'
+  );
+}
+
 export async function getProducts(
   params?: GetProductsParams,
 ): Promise<PaginatedProducts> {
@@ -46,24 +62,58 @@ export async function getProducts(
     return mockGetProducts(params);
   }
 
-  const { search, categoryId, ...rest } = params ?? {};
-  const { data } = await axiosInstance.get<PaginatedProductsResponse>(
-    '/products',
-    {
-      params: {
-        ...rest,
-        ...(search ? { search } : {}),
-        ...(categoryId?.length ? { categoryId } : {}),
-      },
+  const { search, categoryId, sort, page, limit, minPrice, maxPrice, minRating } =
+    params ?? {};
+
+  const { data } = await axiosInstance.get<unknown>('/products', {
+    params: {
+      search: search || undefined,
+      categoryId: categoryId?.length ? categoryId : undefined,
+      sort: sort || undefined,
+      page: page ?? 1,
+      limit: limit ?? PRODUCTS_PAGE_SIZE,
+      minPrice,
+      maxPrice,
+      minRating,
     },
-  );
+    paramsSerializer: (params) =>
+      serializeQueryParams(params as Record<string, string | number | number[] | undefined>),
+  });
+
+  if (isPaginatedResponse(data)) {
+    return {
+      data: data.data.map(mapProduct),
+      total: data.total,
+      page: data.page,
+      limit: data.limit,
+      totalPages: data.totalPages,
+    };
+  }
+
+  if (Array.isArray(data)) {
+    const mapped = data.map((item) =>
+      mapProduct(item as Parameters<typeof mapProduct>[0]),
+    );
+    const total = mapped.length;
+    const pageNum = page ?? 1;
+    const limitNum = limit ?? PRODUCTS_PAGE_SIZE;
+    const totalPages = Math.max(1, Math.ceil(total / limitNum));
+    const start = (pageNum - 1) * limitNum;
+    return {
+      data: mapped.slice(start, start + limitNum),
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+    };
+  }
 
   return {
-    data: data.data.map(mapProduct),
-    total: data.total,
-    page: data.page,
-    limit: data.limit,
-    totalPages: data.totalPages,
+    data: [],
+    total: 0,
+    page: 1,
+    limit: PRODUCTS_PAGE_SIZE,
+    totalPages: 1,
   };
 }
 
@@ -100,4 +150,73 @@ export async function getProductsByCategory(
   categoryId: number,
 ): Promise<PaginatedProducts> {
   return getProducts({ categoryId: [categoryId], limit: PRODUCTS_PAGE_SIZE });
+}
+
+export interface CreateProductPayload {
+  name: string;
+  description?: string;
+  price: number;
+  stock: number;
+  categoryId: number;
+  imageUrl?: string;
+}
+
+export type UpdateProductPayload = Partial<CreateProductPayload>;
+
+export async function createProduct(
+  payload: CreateProductPayload,
+): Promise<Product> {
+  if (isMockMode()) {
+    return mockCreateProduct(payload);
+  }
+
+  const { data } = await axiosInstance.post<Parameters<typeof mapProduct>[0]>(
+    '/products',
+    payload,
+  );
+  return mapProduct(data);
+}
+
+export async function updateProduct(
+  id: number,
+  payload: UpdateProductPayload,
+): Promise<Product> {
+  if (isMockMode()) {
+    return mockUpdateProduct(id, payload);
+  }
+
+  const { data } = await axiosInstance.put<Parameters<typeof mapProduct>[0]>(
+    `/products/${id}`,
+    payload,
+  );
+  return mapProduct(data);
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  if (isMockMode()) {
+    return mockDeleteProduct(id);
+  }
+
+  await axiosInstance.delete(`/products/${id}`);
+}
+
+export async function uploadProductImage(
+  id: number,
+  file: File,
+): Promise<Product> {
+  if (isMockMode()) {
+    return mockUploadProductImage(id, file);
+  }
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const { data } = await axiosInstance.post<Parameters<typeof mapProduct>[0]>(
+    `/products/${id}/image`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  );
+  return mapProduct(data);
 }

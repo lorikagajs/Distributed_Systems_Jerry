@@ -2,7 +2,23 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { TenantsService } from './tenants.service';
 
+/** Paths that never use a leading /:slug segment */
 const SKIP_PREFIXES = new Set(['api', 'auth', 'tenants', 'health']);
+
+/**
+ * API roots served at /products, /categories, etc. with ?tenantId=.
+ * These must not be treated as tenant slugs.
+ */
+const API_RESOURCE_PREFIXES = new Set([
+  'products',
+  'categories',
+  'cart',
+  'orders',
+  'users',
+  'reviews',
+  'coupons',
+  'wishlist',
+]);
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
@@ -13,7 +29,11 @@ export class TenantMiddleware implements NestMiddleware {
     const segments = path.split('/').filter(Boolean);
     const firstSegment = segments[0];
 
-    if (!firstSegment || SKIP_PREFIXES.has(firstSegment)) {
+    if (
+      !firstSegment ||
+      SKIP_PREFIXES.has(firstSegment) ||
+      API_RESOURCE_PREFIXES.has(firstSegment)
+    ) {
       return next();
     }
 
