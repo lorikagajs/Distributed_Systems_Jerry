@@ -20,6 +20,7 @@ import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     ReviewsModule,
     CouponsModule,
     WishlistModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
