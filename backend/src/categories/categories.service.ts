@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Category } from '@prisma/client';
 import { BaseService } from '../common/base/base.service';
 import { TenantScopedCrudService } from '../common/interfaces/crud-service.interface';
@@ -61,6 +61,16 @@ export class CategoriesService
 
   async remove(tenantId: number, id: number) {
     await this.findOne(tenantId, id);
+
+    const productCount = await this.prisma.product.count({
+      where: { tenantId, categoryId: id },
+    });
+    if (productCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete category: ${productCount} product(s) still assigned. Reassign or remove them first.`,
+      );
+    }
+
     return this.prisma.category.delete({ where: { id } });
   }
 }

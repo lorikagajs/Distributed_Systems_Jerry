@@ -2,11 +2,14 @@ import type {
   Cart,
   CartItem,
   Category,
+  Wishlist,
+  WishlistItem,
   Order,
   OrderItem,
   OrderPayment,
   PaymentMethod,
   Product,
+  ProductImageRecord,
   Review,
   User,
   UserProfile,
@@ -45,34 +48,49 @@ export function mapProduct(raw: {
   name: string;
   description?: string | null;
   price: unknown;
+  compareAtPrice?: unknown | null;
   stock: number;
   imageUrl?: string | null;
   categoryId: number;
   tenantId: number;
   category?: { id: number; name: string } | null;
-  images?: { url: string }[];
+  images?: {
+    id: string;
+    url: string;
+    publicId?: string;
+    isPrimary?: boolean;
+  }[];
   averageRating?: number | null;
   ratings?: number | null;
 }): Product {
-  const galleryUrls =
-    raw.images?.map((img) => img.url).filter(Boolean) ?? [];
-  const imageUrl =
-    raw.imageUrl ?? (galleryUrls.length > 0 ? galleryUrls[0] : null);
+  const imageRecords: ProductImageRecord[] = (raw.images ?? [])
+    .filter((img) => Boolean(img.url))
+    .map((img) => ({
+      id: img.id,
+      url: img.url,
+      publicId: img.publicId ?? '',
+      isPrimary: img.isPrimary ?? false,
+    }))
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+
+  const galleryUrls = imageRecords.map((img) => img.url);
+  const primaryRecord =
+    imageRecords.find((img) => img.isPrimary) ?? imageRecords[0];
+  const imageUrl = raw.imageUrl ?? primaryRecord?.url ?? null;
   const images =
-    galleryUrls.length > 0
-      ? galleryUrls
-      : imageUrl
-        ? [imageUrl]
-        : [];
+    galleryUrls.length > 0 ? galleryUrls : imageUrl ? [imageUrl] : [];
 
   return {
     id: raw.id,
     name: raw.name,
     description: raw.description ?? null,
     price: toNumber(raw.price),
+    compareAtPrice:
+      raw.compareAtPrice != null ? toNumber(raw.compareAtPrice) : null,
     stock: raw.stock,
     imageUrl,
     images,
+    imageRecords,
     categoryId: raw.categoryId,
     category: raw.category ? mapCategory(raw.category) : null,
     tenantId: raw.tenantId,
@@ -121,6 +139,28 @@ export function mapCart(raw: {
     0,
   );
   return { id: raw.id, items, total };
+}
+
+export function mapWishlistItem(raw: {
+  id: number;
+  productId: number;
+  product: Parameters<typeof mapProduct>[0];
+}): WishlistItem {
+  return {
+    id: raw.id,
+    productId: raw.productId,
+    product: mapProduct(raw.product),
+  };
+}
+
+export function mapWishlist(raw: {
+  id: number;
+  items?: Parameters<typeof mapWishlistItem>[0][] | null;
+}): Wishlist {
+  return {
+    id: raw.id,
+    items: (raw.items ?? []).map(mapWishlistItem),
+  };
 }
 
 export function mapOrderItem(raw: {
@@ -184,7 +224,8 @@ export function mapOrder(raw: {
   status: string;
   totalAmount: unknown;
   createdAt: string;
-  items: Parameters<typeof mapOrderItem>[0][];
+  items?: Parameters<typeof mapOrderItem>[0][];
+  user?: { id: number; email: string; name?: string | null } | null;
   shippingAddress?: Parameters<typeof mapShippingAddress>[0];
   address?: Parameters<typeof mapShippingAddress>[0];
   payments?: {
@@ -199,12 +240,19 @@ export function mapOrder(raw: {
     id: raw.id,
     status: raw.status,
     total: toNumber(raw.totalAmount),
-    items: raw.items.map(mapOrderItem),
+    items: (raw.items ?? []).map(mapOrderItem),
     createdAt: raw.createdAt,
     shippingAddress:
       mapShippingAddress(raw.shippingAddress) ??
       mapShippingAddress(raw.address),
     payments: raw.payments?.map(mapOrderPayment),
+    customer: raw.user
+      ? {
+          id: raw.user.id,
+          email: raw.user.email,
+          name: resolveDisplayName(raw.user),
+        }
+      : null,
   };
 }
 

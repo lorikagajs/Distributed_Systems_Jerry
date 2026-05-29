@@ -3,6 +3,11 @@ import { UserRole } from '@prisma/client';
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
+  @ApiPropertyOptional({ example: 'Jane Customer' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
   @ApiProperty({ example: 'newuser@store.com' })
   @IsEmail()
   email!: string;

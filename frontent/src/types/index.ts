@@ -14,14 +14,25 @@ export interface Category {
   imageUrl: string | null;
 }
 
+export interface ProductImageRecord {
+  id: string;
+  url: string;
+  publicId: string;
+  isPrimary: boolean;
+}
+
 export interface Product {
   id: number;
   name: string;
   description: string | null;
   price: number;
+  compareAtPrice?: number | null;
   stock: number;
   imageUrl: string | null;
+  /** Ordered gallery URLs (primary first). */
   images: string[];
+  /** Full image metadata from the API. */
+  imageRecords: ProductImageRecord[];
   categoryId: number;
   category: Category | null;
   tenantId: number;
@@ -41,6 +52,17 @@ export interface Cart {
   id: number;
   items: CartItem[];
   total: number;
+}
+
+export interface WishlistItem {
+  id: number;
+  productId: number;
+  product: Product;
+}
+
+export interface Wishlist {
+  id: number;
+  items: WishlistItem[];
 }
 
 export interface OrderItem {
@@ -83,6 +105,12 @@ export interface Order {
   createdAt: string;
   shippingAddress?: ShippingAddress | null;
   payments?: OrderPayment[];
+  customer?: { id: number; name: string; email: string } | null;
+}
+
+export interface AdminCustomer extends UserProfile {
+  isBlocked: boolean;
+  orderCount: number;
 }
 
 export interface Review {

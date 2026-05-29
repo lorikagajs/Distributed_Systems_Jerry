@@ -16,23 +16,25 @@ import { ShippingAddressDto } from './dto/shipping-address.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 const orderInclude = {
-  items: { include: { product: true } },
+  items: { include: { product: { include: { category: true, images: true } } } },
   payments: { orderBy: { createdAt: 'desc' as const } },
-  user: { select: { id: true, email: true } },
+  user: { select: { id: true, email: true, name: true } },
+  shipping: true,
 };
 
 @Injectable()
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAllForUser(tenantId: number, userId: number) {
-    return this.prisma.order
-      .findMany({
-        where: { tenantId, userId },
-        include: orderInclude,
-        orderBy: { createdAt: 'desc' },
-      })
-      .then((orders) => orders.map((order) => this.withShippingAddress(order)));
+  async findAllForUser(tenantId: number, userId: number) {
+    const orders = await this.prisma.order.findMany({
+      where: { tenantId, userId },
+      include: orderInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return Promise.all(
+      orders.map((order) => this.withShippingAddress(order)),
+    );
   }
 
   async findOneForUser(tenantId: number, userId: number, id: number) {
@@ -126,6 +128,48 @@ export class OrdersService {
 
       return this.attachShippingAddress(order, shippingAddress);
     });
+  }
+
+  async findAllForTenant(tenantId: number) {
+    const orders = await this.prisma.order.findMany({
+      where: { tenantId },
+      include: orderInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return Promise.all(
+      orders.map((order) => this.withShippingAddress(order)),
+    );
+  }
+
+  async findOneForTenant(tenantId: number, id: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, tenantId },
+      include: orderInclude,
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with id ${id} not found`);
+    }
+    return this.withShippingAddress(order);
+  }
+
+  async acceptOrder(tenantId: number, id: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, tenantId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with id ${id} not found`);
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(
+        `Only pending orders can be accepted (current: ${order.status})`,
+      );
+    }
+    const updated = await this.prisma.order.update({
+      where: { id },
+      data: { status: OrderStatus.CONFIRMED },
+      include: orderInclude,
+    });
+    return this.withShippingAddress(updated);
   }
 
   async updateStatus(

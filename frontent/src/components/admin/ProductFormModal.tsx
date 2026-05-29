@@ -1,13 +1,14 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { getApiErrorMessage } from '../../api/auth';
 import {
   createProduct,
   updateProduct,
-  uploadProductImage,
+  uploadProductImages,
   type CreateProductPayload,
 } from '../../api/products';
+import { productFormSchema } from '../../schemas/adminSchemas';
 import type { Category, Product } from '../../types';
 
 interface ProductFormModalProps {
@@ -22,6 +23,7 @@ const emptyForm = {
   name: '',
   description: '',
   price: '',
+  compareAtPrice: '',
   stock: '',
   categoryId: '',
   imageUrl: '',
@@ -36,9 +38,12 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   const titleId = useId();
   const [form, setForm] = useState(emptyForm);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
+  /** Set when create succeeded but image upload failed — avoids duplicate products on retry. */
+  const pendingProductIdRef = useRef<number | null>(null);
 
   const isEdit = product != null;
 
@@ -50,6 +55,8 @@ export function ProductFormModal({
         name: product.name,
         description: product.description ?? '',
         price: String(product.price),
+        compareAtPrice:
+          product.compareAtPrice != null ? String(product.compareAtPrice) : '',
         stock: String(product.stock),
         categoryId: String(product.categoryId),
         imageUrl: product.imageUrl ?? '',
@@ -60,8 +67,9 @@ export function ProductFormModal({
         categoryId: categories[0] ? String(categories[0].id) : '',
       });
     }
-    setImageFile(null);
+    setImageFiles([]);
     setError('');
+    pendingProductIdRef.current = null;
   }, [open, product, categories]);
 
   useEffect(() => {
@@ -83,53 +91,66 @@ export function ProductFormModal({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+
     setError('');
 
-    const price = Number(form.price);
-    const stock = Number(form.stock);
-    const categoryId = Number(form.categoryId);
+    const parsed = productFormSchema.safeParse({
+      ...form,
+      imageUrl: form.imageUrl.trim() || undefined,
+    });
 
-    if (!form.name.trim()) {
-      setError('Product name is required.');
-      return;
-    }
-    if (Number.isNaN(price) || price < 0) {
-      setError('Enter a valid price.');
-      return;
-    }
-    if (!Number.isInteger(stock) || stock < 0) {
-      setError('Enter a valid stock quantity.');
-      return;
-    }
-    if (!categoryId) {
-      setError('Select a category.');
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Invalid form data');
       return;
     }
 
     const payload: CreateProductPayload = {
-      name: form.name.trim(),
-      description: form.description.trim() || undefined,
-      price,
-      stock,
-      categoryId,
-      imageUrl: form.imageUrl.trim() || undefined,
+      name: parsed.data.name,
+      description: parsed.data.description?.trim() || undefined,
+      price: parsed.data.price,
+      compareAtPrice: parsed.data.compareAtPrice,
+      stock: parsed.data.stock,
+      categoryId: parsed.data.categoryId,
+      imageUrl: parsed.data.imageUrl,
     };
 
+    submittingRef.current = true;
     setSaving(true);
     try {
-      let saved = isEdit
-        ? await updateProduct(product.id, payload)
-        : await createProduct(payload);
+      const existingId = isEdit
+        ? product.id
+        : pendingProductIdRef.current ?? undefined;
 
-      if (imageFile) {
-        saved = await uploadProductImage(saved.id, imageFile);
+      let saved =
+        existingId != null
+          ? await updateProduct(existingId, payload)
+          : await createProduct(payload);
+
+      if (!isEdit && existingId == null) {
+        pendingProductIdRef.current = saved.id;
       }
 
+      if (imageFiles.length > 0) {
+        try {
+          saved = await uploadProductImages(saved.id, imageFiles);
+        } catch (uploadErr) {
+          setError(
+            `${getApiErrorMessage(uploadErr, 'Image upload failed.')}` +
+              ' The product was saved; fix the images and click Create again to retry upload.',
+          );
+          onSaved(saved);
+          return;
+        }
+      }
+
+      pendingProductIdRef.current = null;
       onSaved(saved);
       onClose();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save product.'));
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   };
@@ -195,9 +216,10 @@ export function ProductFormModal({
             </label>
             <textarea
               id="product-description"
-              rows={3}
+              rows={4}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Supports plain text or markdown"
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
             />
           </div>
@@ -219,20 +241,40 @@ export function ProductFormModal({
               />
             </div>
             <div>
-              <label htmlFor="product-stock" className="block text-sm font-medium text-gray-700">
-                Stock
+              <label
+                htmlFor="product-compare-price"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Compare-at (€)
               </label>
               <input
-                id="product-stock"
+                id="product-compare-price"
                 type="number"
                 min={0}
-                step={1}
-                required
-                value={form.stock}
-                onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                step="0.01"
+                value={form.compareAtPrice}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, compareAtPrice: e.target.value }))
+                }
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="product-stock" className="block text-sm font-medium text-gray-700">
+              Stock
+            </label>
+            <input
+              id="product-stock"
+              type="number"
+              min={0}
+              step={1}
+              required
+              value={form.stock}
+              onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+            />
           </div>
 
           <div>
@@ -273,13 +315,16 @@ export function ProductFormModal({
 
           <div>
             <label htmlFor="product-image-file" className="block text-sm font-medium text-gray-700">
-              Upload image
+              Upload images
             </label>
             <input
               id="product-image-file"
               type="file"
               accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              multiple
+              onChange={(e) =>
+                setImageFiles(Array.from(e.target.files ?? []))
+              }
               className="mt-1 w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
             />
           </div>

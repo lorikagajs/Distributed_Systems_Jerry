@@ -12,6 +12,8 @@ export interface AuthUser {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token?: string;
+  user?: AuthUser;
 }
 
 export interface RegisterResponse {
@@ -28,6 +30,11 @@ export async function loginUser(
     password,
     tenantId,
   });
+  return data;
+}
+
+export async function getAuthMe(): Promise<AuthUser> {
+  const { data } = await axiosInstance.get<AuthUser>('/auth/me');
   return data;
 }
 

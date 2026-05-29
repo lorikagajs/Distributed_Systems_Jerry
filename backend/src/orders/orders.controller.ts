@@ -35,6 +35,26 @@ export class OrdersController {
     return this.ordersService.findAllForUser(user.tenantId, user.userId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get('manage/all')
+  @ApiOperation({ summary: 'List all tenant orders (admin only)' })
+  findAllAdmin(@CurrentUser() user: AuthUser) {
+    return this.ordersService.findAllForTenant(user.tenantId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get('manage/:id')
+  @ApiOperation({ summary: 'Get any tenant order by ID (admin only)' })
+  @ApiParam({ name: 'id', type: Number })
+  findOneAdmin(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordersService.findOneForTenant(user.tenantId, id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get one of your orders by ID' })
   @ApiParam({ name: 'id', type: Number })
@@ -49,6 +69,18 @@ export class OrdersController {
   @ApiOperation({ summary: 'Place a new order' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
     return this.ordersService.create(user.tenantId, user.userId, dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Patch(':id/accept')
+  @ApiOperation({ summary: 'Accept a pending order (admin only)' })
+  @ApiParam({ name: 'id', type: Number })
+  acceptOrder(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordersService.acceptOrder(user.tenantId, id);
   }
 
   @UseGuards(RolesGuard)
