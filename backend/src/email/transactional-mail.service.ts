@@ -35,25 +35,15 @@ export class TransactionalMailService {
       `"${payload.tenant.storeName}" <noreply@localhost>`,
     );
 
-    const overrideTo = this.config.get<string>('EMAIL_OVERRIDE_TO')?.trim();
-    const recipient = overrideTo || payload.customerEmail;
-
     await this.mailer.sendMail({
-      to: recipient,
+      to: payload.customerEmail,
       from,
       subject: buildOrderConfirmationSubject(payload),
       html: buildOrderConfirmationHtml(payload),
     });
 
-    if (overrideTo && overrideTo !== payload.customerEmail) {
-      this.logger.log(
-        `Order confirmation for order #${payload.orderId} sent to ${recipient} (EMAIL_OVERRIDE_TO; account email is ${payload.customerEmail})`,
-      );
-      return;
-    }
-
     this.logger.log(
-      `Order confirmation email sent to ${recipient} for order #${payload.orderId}`,
+      `Order confirmation email sent to ${payload.customerEmail} for order #${payload.orderId}`,
     );
   }
 }
