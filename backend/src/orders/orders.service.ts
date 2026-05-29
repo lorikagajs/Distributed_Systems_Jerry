@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -10,6 +11,7 @@ import {
   Prisma,
   ShippingStatus,
 } from '@prisma/client';
+import { EmailProducerService } from '../email/email-producer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ShippingAddressDto } from './dto/shipping-address.dto';
@@ -24,7 +26,12 @@ const orderInclude = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(OrdersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailProducer: EmailProducerService,
+  ) {}
 
   async findAllForUser(tenantId: number, userId: number) {
     const orders = await this.prisma.order.findMany({
@@ -124,6 +131,13 @@ export class OrdersService {
           },
         },
         include: orderInclude,
+      });
+
+      void this.emailProducer.enqueueOrderConfirmation(order).catch((err) => {
+        this.logger.error(
+          `Failed to enqueue order confirmation email for order #${order.id}`,
+          err instanceof Error ? err.stack : String(err),
+        );
       });
 
       return this.attachShippingAddress(order, shippingAddress);
