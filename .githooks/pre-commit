@@ -1,0 +1,17 @@
+#!/bin/sh
+# Block committing secret env files (.env.example is allowed).
+
+blocked=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(^|/)\.env(\.|$)' | grep -vE '\.env\.example$|\.env\..+\.example$' || true)
+
+if [ -n "$blocked" ]; then
+  echo ""
+  echo "pre-commit: Refusing to commit environment files with secrets:"
+  echo "$blocked" | sed 's/^/  - /'
+  echo ""
+  echo "Use .env.example for templates. Keep secrets in .env (gitignored)."
+  echo "If .env was tracked before, run: git rm --cached <file>"
+  echo ""
+  exit 1
+fi
+
+exit 0

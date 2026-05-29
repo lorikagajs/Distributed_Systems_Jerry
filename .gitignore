@@ -12,12 +12,15 @@ backend/dist/
 frontend/dist/
 build/
 
-# Environment variables
+# Environment variables (never commit secrets — use *.env.example as templates)
 .env
-.env.local
-.env.*.local
-backend/.env
-frontend/.env
+.env.*
+**/.env
+**/.env.*
+**/.env.local
+**/.env.*.local
+!**/.env.example
+!**/.env.*.example
 
 # Logs
 *.log
