@@ -2,7 +2,14 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../config/env';
 
 /** Paths that must not receive an automatic tenantId query param */
-const SKIP_TENANT_QUERY_PREFIXES = ['/tenants', '/auth', '/cart', '/orders', '/users'];
+const SKIP_TENANT_QUERY_PREFIXES = [
+  '/tenants',
+  '/auth',
+  '/cart',
+  '/orders',
+  '/users',
+  '/wishlist',
+];
 
 let currentTenantId: number | null = null;
 

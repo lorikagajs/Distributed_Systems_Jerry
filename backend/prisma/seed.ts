@@ -4,6 +4,8 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 10;
 const DEMO_PASSWORD = 'Password123!';
+const ADMIN_LOGIN = 'admin';
+const ADMIN_PASSWORD = 'adminadmin';
 
 /** Stable product images (picsum seeds avoid broken Unsplash links). */
 function productImage(tenantSlug: string, key: string): string {
@@ -707,6 +709,7 @@ function validateTenantProducts(tenant: SeedTenant) {
 
 async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
+  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, BCRYPT_ROUNDS);
 
   console.log('\n--- Seeding database (5 shops) ---\n');
 
@@ -785,7 +788,12 @@ async function main() {
           where: { productId: existing.id },
         });
         await prisma.productImage.create({
-          data: { productId: existing.id, url: imageUrl },
+          data: {
+            productId: existing.id,
+            url: imageUrl,
+            publicId: '',
+            isPrimary: true,
+          },
         });
       } else {
         await prisma.product.create({
@@ -797,7 +805,9 @@ async function main() {
             categoryId,
             tenantId: tenant.id,
             imageUrl,
-            images: { create: { url: imageUrl } },
+            images: {
+              create: { url: imageUrl, publicId: '', isPrimary: true },
+            },
           },
         });
       }
@@ -822,23 +832,31 @@ async function main() {
       },
     });
 
-    await prisma.user.upsert({
-      where: {
-        tenantId_email: { tenantId: tenant.id, email: tenantData.email },
-      },
-      update: {
-        name: 'Store Admin',
-        password: passwordHash,
-        role: UserRole.ADMIN,
-      },
-      create: {
-        email: tenantData.email,
-        name: 'Store Admin',
-        password: passwordHash,
-        tenantId: tenant.id,
-        role: UserRole.ADMIN,
-      },
+    const existingAdmin = await prisma.user.findFirst({
+      where: { tenantId: tenant.id, role: UserRole.ADMIN },
     });
+
+    if (existingAdmin) {
+      await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: {
+          email: ADMIN_LOGIN,
+          name: 'Store Admin',
+          password: adminPasswordHash,
+          role: UserRole.ADMIN,
+        },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          email: ADMIN_LOGIN,
+          name: 'Store Admin',
+          password: adminPasswordHash,
+          tenantId: tenant.id,
+          role: UserRole.ADMIN,
+        },
+      });
+    }
 
     const productCount = tenantData.products.length;
     console.log(`✓ ${tenantData.storeName} (${tenantData.slug})`);
@@ -847,7 +865,7 @@ async function main() {
     );
     console.log(`    Theme: ${tenantData.primaryColor} / ${tenantData.secondaryColor}`);
     console.log(`    Customer: ${customerEmail} / ${DEMO_PASSWORD}`);
-    console.log(`    Admin:    ${tenantData.email} / ${DEMO_PASSWORD}`);
+    console.log(`    Admin:    ${ADMIN_LOGIN} / ${ADMIN_PASSWORD}`);
   }
 
   console.log('\n--- Seed complete: 5 shops ready ---\n');

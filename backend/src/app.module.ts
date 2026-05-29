@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { Keyv } from 'keyv';
+import { createClient } from '@redis/client';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
@@ -20,6 +21,7 @@ import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { UsersModule } from './users/users.module';
 import { AiModule } from './ai/ai.module';
 
 @Module({
@@ -28,18 +30,49 @@ import { AiModule } from './ai/ai.module';
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => {
+      useFactory: async (config: ConfigService) => {
         const ttlMs = Number(config.get('CACHE_TTL', 60)) * 1000;
         const redisUrl = config.get<string>(
           'REDIS_URL',
           'redis://localhost:6379',
         );
+
+        let store: KeyvRedis<unknown> | undefined;
+        try {
+          const client = createClient({
+            url: redisUrl,
+            socket: {
+              connectTimeout: 2000,
+              reconnectStrategy: () => false,
+            },
+          });
+          client.on('error', () => {});
+          await client.connect();
+          await client.disconnect();
+
+          store = new KeyvRedis(redisUrl);
+          console.log(
+            `[Cache] Successfully connected to Redis at ${redisUrl}. Caching is enabled with Redis.`,
+          );
+        } catch (error: unknown) {
+          store = undefined;
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.warn(
+            `[Cache] Failed to connect to Redis at ${redisUrl}. Falling back to in-memory cache. Error: ${message}`,
+          );
+        }
+
+        const keyvOptions: { ttl: number; store?: KeyvRedis<unknown> } = {
+          ttl: ttlMs,
+        };
+        if (store) {
+          keyvOptions.store = store;
+        }
+
         return {
           stores: [
-            new Keyv({
-              store: new KeyvRedis(redisUrl),
-              ttl: ttlMs,
-            }),
+            new Keyv(keyvOptions),
           ],
           ttl: ttlMs,
         };
@@ -56,6 +89,7 @@ import { AiModule } from './ai/ai.module';
     ReviewsModule,
     CouponsModule,
     WishlistModule,
+    UsersModule,
     AiModule,
   ],
   controllers: [AppController],

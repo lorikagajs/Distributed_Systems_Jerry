@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -26,6 +27,7 @@ import { BaseController } from '../common/base/base.controller';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SetBlockedDto } from './dto/set-blocked.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
@@ -97,6 +99,21 @@ export class UsersController extends BaseController<UsersService> {
   @ApiOperation({ summary: 'Delete current user account' })
   deleteProfile(@CurrentUser() user: AuthUser) {
     return this.service.deleteProfile(this.tenantIdFrom(user), user.userId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Patch(':id/block')
+  @ApiOperation({ summary: 'Block or unblock a user (admin only)' })
+  @ApiParam({ name: 'id', type: Number })
+  setBlocked(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SetBlockedDto,
+  ) {
+    return this.service.update(this.tenantIdFrom(user), id, {
+      isBlocked: dto.isBlocked,
+    });
   }
 
   @Get(':id')

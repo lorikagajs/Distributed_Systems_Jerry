@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { LayoutDashboard, Search, ShoppingCart } from 'lucide-react';
+import { Heart, LayoutDashboard, Search, ShoppingCart } from 'lucide-react';
 import { getCategories } from '../../api/products';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -118,13 +118,26 @@ export function Navbar() {
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           {isAdmin && (
             <Link
-              to={tenantPath('/admin')}
+              to={tenantPath('/admin/products')}
               className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/15 sm:inline-flex sm:px-3 sm:text-sm"
             >
               <LayoutDashboard className="size-4" aria-hidden />
               Admin
             </Link>
           )}
+
+          <Link
+            to={isLoggedIn ? tenantPath('/wishlist') : tenantPath('/login')}
+            state={
+              isLoggedIn
+                ? undefined
+                : { message: 'Please login to view your wishlist' }
+            }
+            className="rounded-lg p-2 text-white transition-colors hover:bg-white/15"
+            aria-label="Wishlist"
+          >
+            <Heart className="size-6" />
+          </Link>
 
           <Link
             to={isLoggedIn ? tenantPath('/cart') : tenantPath('/login')}

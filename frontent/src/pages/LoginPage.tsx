@@ -2,9 +2,9 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { getApiErrorMessage, loginUser } from '../api/auth';
-import { getMyProfile } from '../api/users';
+import { getApiErrorMessage, getAuthMe, loginUser } from '../api/auth';
 import { isAdminRole } from '../constants/roles';
+import { decodeJwtPayload } from '../utils/jwt';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import { useTenantNavigate, useTenantPath } from '../hooks/useTenantNavigate';
@@ -29,27 +29,51 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const data = await loginUser(email, password, tenant?.tenantId);
-      login({ token: data.access_token, user: null });
+      const data = await loginUser(email.trim(), password, tenant?.tenantId);
       let redirectTo = '/';
-      try {
-        const profile = await getMyProfile();
-        login({
-          token: data.access_token,
-          user: {
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            tenantId: profile.tenantId,
-          },
-        });
-        if (isAdminRole(profile.role)) {
-          redirectTo = '/admin';
+
+      login({ token: data.access_token, user: null });
+
+      let authUser = data.user
+        ? {
+            id: data.user.id,
+            name: data.user.name ?? data.user.email,
+            email: data.user.email,
+            role: data.user.role,
+            tenantId: data.user.tenantId,
+          }
+        : null;
+
+      if (!authUser) {
+        try {
+          const me = await getAuthMe();
+          authUser = {
+            id: me.id,
+            name: me.name ?? me.email,
+            email: me.email,
+            role: me.role,
+            tenantId: me.tenantId,
+          };
+        } catch {
+          const claims = decodeJwtPayload(data.access_token);
+          if (claims?.sub != null && claims.role && claims.tenantId != null) {
+            authUser = {
+              id: claims.userId ?? claims.sub,
+              name: claims.email?.split('@')[0] ?? 'User',
+              email: claims.email ?? email,
+              role: claims.role,
+              tenantId: claims.tenantId,
+            };
+          }
         }
-      } catch {
-        // Profile loads on next visit; cart count still refreshes via CartContext
       }
+
+      login({ token: data.access_token, user: authUser });
+
+      if (authUser && isAdminRole(authUser.role)) {
+        redirectTo = '/admin/products';
+      }
+
       tenantNavigate(redirectTo);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Invalid email or password.'));
@@ -90,13 +114,13 @@ export function LoginPage() {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email
+              Username or email
             </label>
             <input
               id="email"
-              type="email"
+              type="text"
               required
-              autoComplete="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"

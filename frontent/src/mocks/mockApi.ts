@@ -204,6 +204,7 @@ export async function mockCreateProduct(
   const nextId =
     products.reduce((max, p) => Math.max(max, p.id), tenantId * 100) + 1;
 
+  const images = payload.imageUrl ? [payload.imageUrl] : [];
   const product: Product = {
     id: nextId,
     name: payload.name,
@@ -213,7 +214,13 @@ export async function mockCreateProduct(
     categoryId: payload.categoryId,
     tenantId,
     imageUrl: payload.imageUrl ?? null,
-    images: payload.imageUrl ? [payload.imageUrl] : [],
+    images,
+    imageRecords: images.map((url, index) => ({
+      id: `mock-${nextId}-${index}`,
+      url,
+      publicId: '',
+      isPrimary: index === 0,
+    })),
     category,
     ratings: null,
     createdAt: new Date().toISOString(),
@@ -248,16 +255,24 @@ export async function mockUpdateProduct(
   const imageUrl =
     payload.imageUrl !== undefined ? payload.imageUrl : current.imageUrl;
 
+  const images =
+    imageUrl != null
+      ? [imageUrl, ...current.images.filter((u) => u !== imageUrl)]
+      : current.images;
+
   const updated: Product = {
     ...current,
     ...payload,
     categoryId,
     category,
     imageUrl,
-    images:
-      imageUrl != null
-        ? [imageUrl, ...current.images.filter((u) => u !== imageUrl)]
-        : current.images,
+    images,
+    imageRecords: images.map((url, index) => ({
+      id: `mock-${id}-${index}`,
+      url,
+      publicId: '',
+      isPrimary: index === 0,
+    })),
   };
 
   products[index] = updated;
@@ -302,6 +317,15 @@ export async function mockUploadProductImage(
     ...current,
     imageUrl,
     images,
+    imageRecords: [
+      ...current.imageRecords,
+      {
+        id: `mock-upload-${Date.now()}`,
+        url: objectUrl,
+        publicId: '',
+        isPrimary: !current.imageUrl,
+      },
+    ],
   };
 
   products[index] = updated;

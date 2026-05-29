@@ -12,8 +12,12 @@ if (cloudName && apiKey && apiSecret) {
   });
 }
 
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(cloudName && apiKey && apiSecret);
+}
+
 export function ensureCloudinaryConfigured(): void {
-  if (!cloudName || !apiKey || !apiSecret) {
+  if (!isCloudinaryConfigured()) {
     throw new Error(
       'Cloudinary environment variables are not set. Configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.',
     );

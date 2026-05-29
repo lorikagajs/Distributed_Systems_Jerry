@@ -19,6 +19,7 @@ const userSelect = {
   name: true,
   role: true,
   tenantId: true,
+  isBlocked: true,
   createdAt: true,
 } as const;
 
@@ -38,7 +39,10 @@ export class UsersService
   findAll(tenantId: number) {
     return this.prisma.user.findMany({
       where: { tenantId },
-      select: this.userSelect(),
+      select: {
+        ...this.userSelect(),
+        _count: { select: { orders: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -46,7 +50,10 @@ export class UsersService
   async findOne(tenantId: number, id: number) {
     const user = await this.prisma.user.findFirst({
       where: { id, tenantId },
-      select: this.userSelect(),
+      select: {
+        ...this.userSelect(),
+        _count: { select: { orders: true } },
+      },
     });
 
     return this.ensureEntityFound(user, id);
@@ -71,11 +78,15 @@ export class UsersService
     return this.prisma.user.create({
       data: {
         email: dto.email,
+        name: dto.name?.trim() || null,
         password: hashedPassword,
         tenantId,
         role: dto.role ?? UserRole.CUSTOMER,
       },
-      select: this.userSelect(),
+      select: {
+        ...this.userSelect(),
+        _count: { select: { orders: true } },
+      },
     });
   }
 
@@ -100,6 +111,7 @@ export class UsersService
     const data: Prisma.UserUpdateInput = {
       email: dto.email,
       role: dto.role,
+      isBlocked: dto.isBlocked,
     };
 
     if (dto.password) {

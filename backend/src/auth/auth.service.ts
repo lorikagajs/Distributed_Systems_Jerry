@@ -85,9 +85,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (authenticatedUser.isBlocked) {
+      throw new UnauthorizedException('This account has been blocked');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: authenticatedUser.id },
+      select: this.userSelect(),
+    });
+
     return {
       access_token: this.signToken(authenticatedUser),
       refresh_token: this.signRefreshToken(authenticatedUser),
+      user: user!,
     };
   }
 
@@ -107,6 +117,10 @@ export class AuthService {
 
       if (!user) {
         throw new UnauthorizedException('User not found');
+      }
+
+      if (user.isBlocked) {
+        throw new UnauthorizedException('This account has been blocked');
       }
 
       return {
@@ -168,6 +182,7 @@ export class AuthService {
       name: true,
       role: true,
       tenantId: true,
+      isBlocked: true,
       createdAt: true,
     } as const;
   }

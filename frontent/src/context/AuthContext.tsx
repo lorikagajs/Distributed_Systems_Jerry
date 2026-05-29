@@ -6,7 +6,8 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { getMyProfile } from '../api/users';
+import { getAuthMe } from '../api/auth';
+import { decodeJwtPayload } from '../utils/jwt';
 import { isAdminRole } from '../constants/roles';
 import type { User } from '../types';
 
@@ -56,19 +57,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     setAuthLoading(true);
 
-    getMyProfile()
-      .then((profile) => {
+    getAuthMe()
+      .then((me) => {
         if (cancelled) return;
         setUser({
-          id: profile.id,
-          name: profile.name,
-          email: profile.email,
-          role: profile.role,
-          tenantId: profile.tenantId,
+          id: me.id,
+          name: me.name ?? me.email.split('@')[0],
+          email: me.email,
+          role: me.role,
+          tenantId: me.tenantId,
         });
       })
       .catch(() => {
-        if (!cancelled) logout();
+        if (cancelled) return;
+        const claims = decodeJwtPayload(token);
+        if (
+          claims?.sub != null &&
+          claims.role &&
+          claims.tenantId != null
+        ) {
+          setUser({
+            id: claims.userId ?? claims.sub,
+            name: claims.email?.split('@')[0] ?? 'User',
+            email: claims.email ?? '',
+            role: claims.role,
+            tenantId: claims.tenantId,
+          });
+          return;
+        }
+        logout();
       })
       .finally(() => {
         if (!cancelled) setAuthLoading(false);

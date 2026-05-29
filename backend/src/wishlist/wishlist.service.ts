@@ -7,6 +7,20 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddWishlistItemDto } from './dto/add-wishlist-item.dto';
+import { productImagesInclude } from '../products/product-images.helper';
+
+const wishlistProductInclude = {
+  category: true,
+  images: productImagesInclude,
+};
+
+const wishlistInclude = {
+  items: {
+    include: {
+      product: { include: wishlistProductInclude },
+    },
+  },
+};
 
 @Injectable()
 export class WishlistService {
@@ -16,9 +30,7 @@ export class WishlistService {
     const wishlist = await this.getOrCreateWishlist(tenantId, userId);
     return this.prisma.wishlist.findUnique({
       where: { id: wishlist.id },
-      include: {
-        items: { include: { product: true } },
-      },
+      include: wishlistInclude,
     });
   }
 

@@ -1,13 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { ProductImageInputDto } from './product-image-input.dto';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Wireless Mouse' })
@@ -26,6 +29,13 @@ export class CreateProductDto {
   @Min(0)
   price!: number;
 
+  @ApiPropertyOptional({ example: 39.99, description: 'Original price before discount' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  compareAtPrice?: number;
+
   @ApiProperty({ example: 100 })
   @Type(() => Number)
   @IsInt()
@@ -39,9 +49,19 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     example: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
-    description: 'Primary product image URL',
+    description: 'Legacy single primary image URL',
   })
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @ApiPropertyOptional({
+    type: [ProductImageInputDto],
+    description: 'Gallery images (URLs). First entry is primary unless isPrimary is set.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductImageInputDto)
+  imageUrls?: ProductImageInputDto[];
 }

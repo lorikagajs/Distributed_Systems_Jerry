@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  ChevronRight,
-  Heart,
-  ImageOff,
-  Loader2,
-  Minus,
-  Plus,
-  ShoppingCart,
-} from 'lucide-react';
+import { ChevronRight, Heart, Loader2, Minus, Plus, ShoppingCart } from 'lucide-react';
+import { ProductGallery } from '../components/products/ProductGallery';
+import { getApiErrorMessage } from '../api/auth';
 import { addToCart } from '../api/cart';
 import { getProductById, getProducts } from '../api/products';
 import { addReview, getProductReviews } from '../api/reviews';
+import {
+  addToWishlist,
+  getWishlist,
+  removeFromWishlist,
+} from '../api/wishlist';
 import { ProductCard } from '../components/products/ProductCard';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { StarRating } from '../components/ui/StarRating';
@@ -52,22 +51,15 @@ export function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [togglingWishlist, setTogglingWishlist] = useState(false);
 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-
-  const galleryImages = useMemo(() => {
-    if (!product) return [];
-    return product.images.length > 0
-      ? product.images
-      : product.imageUrl
-        ? [product.imageUrl]
-        : [];
-  }, [product]);
 
   const averageRating = useMemo(() => {
     if (reviews.length > 0) {
@@ -95,7 +87,6 @@ export function ProductDetailPage() {
         if (cancelled) return;
 
         setProduct(prod);
-        setSelectedImage(0);
         setQuantity(1);
 
         const [reviewsRes, relatedRes] = await Promise.all([
@@ -128,6 +119,34 @@ export function ProductDetailPage() {
     };
   }, [productId]);
 
+  useEffect(() => {
+    if (!token || !productId || Number.isNaN(productId)) {
+      setInWishlist(false);
+      return;
+    }
+
+    let cancelled = false;
+    setWishlistLoading(true);
+
+    getWishlist()
+      .then((list) => {
+        if (cancelled) return;
+        setInWishlist(
+          list.items.some((item) => item.productId === productId),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setInWishlist(false);
+      })
+      .finally(() => {
+        if (!cancelled) setWishlistLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, productId]);
+
   const scrollToReviews = () => {
     reviewsRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -159,6 +178,40 @@ export function ProductDetailPage() {
       showToast('error', 'Could not add to cart. Please try again.');
     } finally {
       setAddingToCart(false);
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    if (!product) return;
+
+    if (!token) {
+      navigate(tenantPath('/login'), {
+        state: { message: 'Please login to save items to your wishlist' },
+      });
+      return;
+    }
+
+    setTogglingWishlist(true);
+    try {
+      if (inWishlist) {
+        await removeFromWishlist(product.id);
+        setInWishlist(false);
+        showToast('success', 'Removed from wishlist.');
+      } else {
+        await addToWishlist(product.id);
+        setInWishlist(true);
+        showToast('success', 'Added to wishlist.');
+      }
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Could not update wishlist.');
+      if (!inWishlist && message.toLowerCase().includes('already')) {
+        setInWishlist(true);
+        showToast('success', 'Already in your wishlist.');
+      } else {
+        showToast('error', message);
+      }
+    } finally {
+      setTogglingWishlist(false);
     }
   };
 
@@ -226,44 +279,11 @@ export function ProductDetailPage() {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div>
-          <div className="aspect-square overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
-            {galleryImages[selectedImage] ? (
-              <img
-                src={galleryImages[selectedImage]}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-gray-400">
-                <ImageOff className="size-16" />
-              </div>
-            )}
-          </div>
-          {galleryImages.length > 1 && (
-            <ul className="mt-4 flex gap-3 overflow-x-auto pb-1">
-              {galleryImages.map((src, index) => (
-                <li key={src}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedImage(index)}
-                    className={`size-20 shrink-0 overflow-hidden rounded-lg border-2 ${
-                      index === selectedImage
-                        ? 'border-[var(--color-primary)]'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <img
-                      src={src}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <ProductGallery
+          images={product.imageRecords}
+          alt={product.name}
+          fallbackUrls={product.images}
+        />
 
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
@@ -344,11 +364,27 @@ export function ProductDetailPage() {
             {token && (
               <button
                 type="button"
-                className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium text-gray-700 transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                aria-label="Add to wishlist"
+                onClick={() => void handleToggleWishlist()}
+                disabled={wishlistLoading || togglingWishlist}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-6 py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  inWishlist
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                    : 'border-gray-300 text-gray-700 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]'
+                }`}
+                aria-label={
+                  inWishlist ? 'Remove from wishlist' : 'Add to wishlist'
+                }
+                aria-pressed={inWishlist}
               >
-                <Heart className="size-5" />
-                Wishlist
+                {togglingWishlist ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : (
+                  <Heart
+                    className={`size-5 ${inWishlist ? 'fill-current' : ''}`}
+                    aria-hidden
+                  />
+                )}
+                {inWishlist ? 'In wishlist' : 'Wishlist'}
               </button>
             )}
           </div>

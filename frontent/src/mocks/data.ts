@@ -1,8 +1,26 @@
 import type { TenantConfig, TenantListItem } from '../api/tenants';
-import type { Category, Product, Review } from '../types';
+import type { Category, Product, ProductImageRecord, Review } from '../types';
 
 function gallery(primary: string, ...extra: string[]): string[] {
   return [primary, ...extra];
+}
+
+function imageRecordsFromUrls(urls: string[]): ProductImageRecord[] {
+  return urls.map((url, index) => ({
+    id: `mock-img-${index}-${url.slice(-12)}`,
+    url,
+    publicId: '',
+    isPrimary: index === 0,
+  }));
+}
+
+function productWithGallery(
+  product: Omit<Product, 'images' | 'imageRecords'> & { images: string[] },
+): Product {
+  return {
+    ...product,
+    imageRecords: imageRecordsFromUrls(product.images),
+  };
 }
 
 export const MOCK_TENANT_LIST: TenantListItem[] = [
@@ -104,7 +122,7 @@ export const MOCK_CATEGORIES: Record<number, Category[]> = {
   2: adidasCategories,
 };
 
-export const MOCK_PRODUCTS: Record<number, Product[]> = {
+const RAW_MOCK_PRODUCTS: Record<number, Omit<Product, 'imageRecords'>[]> = {
   1: [
     {
       id: 101,
@@ -232,6 +250,13 @@ export const MOCK_PRODUCTS: Record<number, Product[]> = {
     },
   ],
 };
+
+export const MOCK_PRODUCTS: Record<number, Product[]> = Object.fromEntries(
+  Object.entries(RAW_MOCK_PRODUCTS).map(([tenantId, products]) => [
+    Number(tenantId),
+    products.map(productWithGallery),
+  ]),
+) as Record<number, Product[]>;
 
 export const MOCK_REVIEWS: Record<number, Review[]> = {
   101: [

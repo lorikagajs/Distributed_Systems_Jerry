@@ -13,11 +13,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductQueryDto, ProductSortOption } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import {
+  buildImageCreateMany,
+  normalizeImageInputs,
+  primaryImageUrlFromGallery,
+  productImagesInclude,
+} from './product-images.helper';
 import { PRODUCTS_LIST_CACHE_PREFIX } from './products-cache.constants';
 
 const productInclude = {
   category: true,
-  images: { orderBy: { createdAt: 'asc' as const } },
+  images: productImagesInclude,
   reviews: { select: { rating: true } },
 };
 
@@ -101,18 +107,23 @@ export class ProductsService {
 
   async create(tenantId: number, dto: CreateProductDto) {
     await this.ensureCategoryInTenant(tenantId, dto.categoryId);
+
+    const imageInputs = normalizeImageInputs(dto.imageUrls, dto.imageUrl);
+    const imageCreates = buildImageCreateMany(imageInputs);
+    const primaryUrl = primaryImageUrlFromGallery(imageCreates);
+
     const created = await this.prisma.product.create({
       data: {
         name: dto.name,
         description: dto.description,
         price: dto.price,
+        compareAtPrice: dto.compareAtPrice,
         stock: dto.stock,
         categoryId: dto.categoryId,
         tenantId,
-        imageUrl: dto.imageUrl,
-        images: dto.imageUrl
-          ? { create: { url: dto.imageUrl } }
-          : undefined,
+        imageUrl: primaryUrl,
+        images:
+          imageCreates.length > 0 ? { create: imageCreates } : undefined,
       },
       include: productInclude,
     });
@@ -121,70 +132,191 @@ export class ProductsService {
   }
 
   async update(tenantId: number, id: number, dto: UpdateProductDto) {
-    await this.findOne(tenantId, id);
+    const existing = await this.findOne(tenantId, id);
     if (dto.categoryId !== undefined) {
       await this.ensureCategoryInTenant(tenantId, dto.categoryId);
     }
-    const updated = await this.prisma.product.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        price: dto.price,
-        stock: dto.stock,
-        categoryId: dto.categoryId,
-        imageUrl: dto.imageUrl,
-      },
-      include: productInclude,
-    });
-    await this.invalidateProductsListCache(tenantId);
-    return this.withAverageRating(updated);
-  }
-  
-  async uploadImage(
-  tenantId: number,
-  productId: number,
-  file?: Express.Multer.File,
-) {
-  if (!file) {
-    throw new BadRequestException('Image file is required');
-  }
 
-  await this.findOne(tenantId, productId);
+    const hasGalleryUpdate =
+      dto.imageUrls !== undefined || dto.imageUrl !== undefined;
 
-  const imageUrl = await this.cloudinaryService.uploadImage(file);
+    if (hasGalleryUpdate) {
+      const imageInputs = normalizeImageInputs(dto.imageUrls, dto.imageUrl);
+      const imageCreates = buildImageCreateMany(imageInputs);
+      const primaryUrl = primaryImageUrlFromGallery(imageCreates);
 
-  const result = await this.prisma.$transaction(async (tx) => {
-    await tx.productImage.create({
-      data: { productId, url: imageUrl },
-    });
+      const oldPublicIds = existing.images
+        .map((img) => img.publicId)
+        .filter((pid) => pid.length > 0);
 
-    const product = await tx.product.findUnique({
-      where: { id: productId },
-    });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        if (imageCreates.length > 0) {
+          await tx.productImage.createMany({
+            data: imageCreates.map((row) => ({ ...row, productId: id })),
+          });
+        }
+        await tx.product.update({
+          where: { id },
+          data: {
+            name: dto.name,
+            description: dto.description,
+            price: dto.price,
+            compareAtPrice: dto.compareAtPrice,
+            stock: dto.stock,
+            categoryId: dto.categoryId,
+            imageUrl: primaryUrl,
+          },
+        });
+      });
 
-    if (!product?.imageUrl) {
-      await tx.product.update({
-        where: { id: productId },
-        data: { imageUrl },
+      if (oldPublicIds.length > 0) {
+        void this.cloudinaryService.deleteByPublicIds(oldPublicIds);
+      }
+    } else {
+      await this.prisma.product.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          price: dto.price,
+          compareAtPrice: dto.compareAtPrice,
+          stock: dto.stock,
+          categoryId: dto.categoryId,
+        },
       });
     }
 
-    const updatedProduct = await tx.product.findUniqueOrThrow({
-      where: { id: productId },
-      include: productInclude,
+    await this.invalidateProductsListCache(tenantId);
+    return this.findOne(tenantId, id);
+  }
+
+  async uploadImage(
+    tenantId: number,
+    productId: number,
+    file?: Express.Multer.File,
+    setPrimary = false,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    await this.findOne(tenantId, productId);
+
+    const uploaded = await this.cloudinaryService.uploadProductImage(
+      file,
+      tenantId,
+      productId,
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existingCount = await tx.productImage.count({
+        where: { productId },
+      });
+      const makePrimary = setPrimary || existingCount === 0;
+
+      if (makePrimary) {
+        await tx.productImage.updateMany({
+          where: { productId },
+          data: { isPrimary: false },
+        });
+      }
+
+      await tx.productImage.create({
+        data: {
+          productId,
+          url: uploaded.url,
+          publicId: uploaded.publicId,
+          isPrimary: makePrimary,
+        },
+      });
+
+      if (makePrimary) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { imageUrl: uploaded.url },
+        });
+      }
+
+      const updatedProduct = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        include: productInclude,
+      });
+
+      return this.withAverageRating(updatedProduct);
     });
 
-    return this.withAverageRating(updatedProduct);
-  });
+    await this.invalidateProductsListCache(tenantId);
+    return result;
+  }
 
-  await this.invalidateProductsListCache(tenantId);
+  async uploadImages(
+    tenantId: number,
+    productId: number,
+    files: Express.Multer.File[],
+  ) {
+    if (!files?.length) {
+      throw new BadRequestException('At least one image file is required');
+    }
 
-  return result;
-}
-  
+    await this.findOne(tenantId, productId);
+
+    const uploads = await Promise.all(
+      files.map((file) =>
+        this.cloudinaryService.uploadProductImage(file, tenantId, productId),
+      ),
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existingCount = await tx.productImage.count({
+        where: { productId },
+      });
+      let needsPrimary = existingCount === 0;
+
+      for (const uploaded of uploads) {
+        const isPrimary = needsPrimary;
+        if (isPrimary) {
+          await tx.productImage.updateMany({
+            where: { productId },
+            data: { isPrimary: false },
+          });
+        }
+
+        await tx.productImage.create({
+          data: {
+            productId,
+            url: uploaded.url,
+            publicId: uploaded.publicId,
+            isPrimary,
+          },
+        });
+
+        if (isPrimary) {
+          await tx.product.update({
+            where: { id: productId },
+            data: { imageUrl: uploaded.url },
+          });
+          needsPrimary = false;
+        }
+      }
+
+      const updatedProduct = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        include: productInclude,
+      });
+
+      return this.withAverageRating(updatedProduct);
+    });
+
+    await this.invalidateProductsListCache(tenantId);
+    return result;
+  }
+
   async remove(tenantId: number, id: number) {
     await this.findOne(tenantId, id);
+
+    void this.cloudinaryService.deleteProductFolder(tenantId, id);
+
     const deleted = await this.prisma.product.delete({ where: { id } });
     await this.invalidateProductsListCache(tenantId);
     return deleted;

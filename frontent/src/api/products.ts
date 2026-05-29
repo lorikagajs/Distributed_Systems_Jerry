@@ -152,13 +152,21 @@ export async function getProductsByCategory(
   return getProducts({ categoryId: [categoryId], limit: PRODUCTS_PAGE_SIZE });
 }
 
+export interface ProductImageInput {
+  url: string;
+  publicId?: string;
+  isPrimary?: boolean;
+}
+
 export interface CreateProductPayload {
   name: string;
   description?: string;
   price: number;
+  compareAtPrice?: number;
   stock: number;
   categoryId: number;
   imageUrl?: string;
+  imageUrls?: ProductImageInput[];
 }
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;
@@ -213,6 +221,25 @@ export async function uploadProductImage(
 
   const { data } = await axiosInstance.post<Parameters<typeof mapProduct>[0]>(
     `/products/${id}/image`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  );
+  return mapProduct(data);
+}
+
+export async function uploadProductImages(
+  id: number,
+  files: File[],
+): Promise<Product> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('images', file);
+  }
+
+  const { data } = await axiosInstance.post<Parameters<typeof mapProduct>[0]>(
+    `/products/${id}/images`,
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
