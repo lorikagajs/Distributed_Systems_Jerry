@@ -26,7 +26,10 @@ import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '../.env'],
+    }),
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],

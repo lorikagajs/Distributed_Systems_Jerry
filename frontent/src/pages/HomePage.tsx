@@ -5,6 +5,7 @@ import { getCategories, getProducts } from '../api/products';
 import { useTenant } from '../context/TenantContext';
 import { useTenantPath } from '../hooks/useTenantNavigate';
 import { ProductCard } from '../components/products/ProductCard';
+import { TenantBannerImage } from '../components/tenant/TenantBannerImage';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import type { Category, Product } from '../types';
 
@@ -79,18 +80,41 @@ export function HomePage() {
 
   return (
     <div className="-mx-4 -mt-8 sm:-mx-6 lg:-mx-8">
-      <section className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-16 text-white sm:px-6 sm:py-24 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
+      <section
+        className="relative min-h-[280px] overflow-hidden px-4 py-16 text-white sm:min-h-[320px] sm:px-6 sm:py-24 lg:px-8"
+        style={
+          tenant?.bannerUrl
+            ? undefined
+            : {
+                background: `linear-gradient(to right, ${tenant?.primaryColor ?? '#4f46e5'}, ${tenant?.secondaryColor ?? '#7c3aed'})`,
+              }
+        }
+      >
+        {tenant?.bannerUrl ? (
+          <>
+            <TenantBannerImage
+              src={tenant.bannerUrl}
+              className="absolute inset-0 size-full object-cover"
+              fallbackColor={tenant.primaryColor}
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/40"
+              aria-hidden
+            />
+          </>
+        ) : null}
+        <div className="relative z-10 mx-auto max-w-3xl text-center">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             Shop the Best Products
           </h1>
-          <p className="mt-4 text-lg text-indigo-100 sm:text-xl">
+          <p className="mt-4 text-lg text-white/90 sm:text-xl">
             Discover curated collections, exclusive deals, and new arrivals from{' '}
             {tenant?.storeName ?? 'our store'}.
           </p>
           <Link
             to={tenantPath('/products')}
-            className="mt-8 inline-block rounded-lg bg-white px-8 py-3 text-sm font-semibold text-indigo-600 shadow-md transition-transform hover:scale-105"
+            className="mt-8 inline-block rounded-lg bg-white px-8 py-3 text-sm font-semibold shadow-md transition-transform hover:scale-105"
+            style={{ color: tenant?.primaryColor ?? '#4f46e5' }}
           >
             Shop Now
           </Link>
