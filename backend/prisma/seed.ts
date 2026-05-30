@@ -47,9 +47,9 @@ const sampleTenants: SeedTenant[] = [
     primaryColor: '#4f46e5',
     secondaryColor: '#7c3aed',
     logoUrl:
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200&h=200&fit=crop',
+      'https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=200&h=200&fit=crop',
     bannerUrl:
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200',
+      'https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=1200',
     categories: ['Laptops', 'Phones', 'Accessories'],
     products: [
       {
@@ -59,7 +59,7 @@ const sampleTenants: SeedTenant[] = [
         price: 1299.99,
         stock: 25,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800',
       },
       {
         name: 'UltraBook Air 13"',
@@ -68,16 +68,16 @@ const sampleTenants: SeedTenant[] = [
         price: 999.0,
         stock: 30,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1625766763788-95dcce9bf5ac?w=800',
       },
       {
-        name: 'Creator Workstation 17"',
+        name: 'Asus Gaming 17"',
         description:
           '17-inch 4K panel, 32GB RAM, RTX graphics — built for video editors and 3D artists.',
         price: 1899.99,
         stock: 12,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1630794180018-433d915c34ac?w=800',
       },
       {
         name: 'Student Chromebook 14"',
@@ -86,7 +86,7 @@ const sampleTenants: SeedTenant[] = [
         price: 449.99,
         stock: 45,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1616499452581-cc7f8e3dd3c9?w=800',
       },
       {
         name: 'Galaxy Ultra Phone',
@@ -96,17 +96,17 @@ const sampleTenants: SeedTenant[] = [
         stock: 40,
         category: 'Phones',
         imageUrl:
-          'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800',
+          'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=800',
       },
       {
-        name: 'Pixel Compact',
+        name: 'Xiaomi Android',
         description:
           'Pure Android experience, exceptional computational photography, and one-handed ergonomics.',
         price: 649.99,
         stock: 55,
         category: 'Phones',
         imageUrl:
-          'https://images.unsplash.com/photo-1598327666105-d7ce1f2b2c8b?w=800',
+          'https://images.unsplash.com/photo-1701696255815-14a98bc1afcd?w=800',
       },
       {
         name: 'Studio Wireless Earbuds',
@@ -116,7 +116,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 100,
         category: 'Accessories',
         imageUrl:
-          'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800',
+          'https://plus.unsplash.com/premium_photo-1678099940967-73fe30680949?w=800',
       },
       {
         name: 'Mechanical RGB Keyboard',
@@ -126,7 +126,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 60,
         category: 'Accessories',
         imageUrl:
-          'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=800',
+          'https://images.unsplash.com/photo-1595044426077-d36d9236d54a?w=800',
       },
       {
         name: 'Fold Pro Phone',
@@ -135,7 +135,7 @@ const sampleTenants: SeedTenant[] = [
         price: 1199.0,
         stock: 20,
         category: 'Phones',
-        imageUrl: 'https://images.unsplash.com/photo-1556656793-08538906a9f8?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1592813630413-1124aa567638?w=800',
       },
       {
         name: 'Budget Smart 5G',
@@ -144,7 +144,7 @@ const sampleTenants: SeedTenant[] = [
         price: 299.99,
         stock: 70,
         category: 'Phones',
-        imageUrl: 'https://images.unsplash.com/photo-1512499617640-c74ae3a79d37?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1653629213421-83a13907003f?w=800',
       },
       {
         name: 'USB-C Hub 7-in-1',
@@ -153,7 +153,7 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 85,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1628198751554-b5ab58ffdf8e?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1760376789487-994070337c76?w=800',
       },
       {
         name: '4K Webcam Pro',
@@ -162,7 +162,7 @@ const sampleTenants: SeedTenant[] = [
         price: 79.99,
         stock: 55,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1521742468307-2c13d7c50a10?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1623949556303-b0d17d198863?w=800',
       },
     ],
   },
@@ -178,7 +178,7 @@ const sampleTenants: SeedTenant[] = [
     logoUrl:
       'https://images.unsplash.com/photo-1445205170230-053b83016050?w=200&h=200&fit=crop',
     bannerUrl:
-      'https://images.unsplash.com/photo-1441984904996-e0b6a778b4ad?w=1200',
+      'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200',
     categories: ['Men', 'Women', 'Accessories'],
     products: [
       {
@@ -189,7 +189,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 35,
         category: 'Men',
         imageUrl:
-          'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800',
+          'https://images.unsplash.com/photo-1577660002965-04865592fc60?w=800',
       },
       {
         name: 'Slim Chino Trousers',
@@ -209,7 +209,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 50,
         category: 'Women',
         imageUrl:
-          'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=800',
+          'https://images.unsplash.com/photo-1511130558090-00af810c21b1?w=800',
       },
       {
         name: 'Wool Blend Trench Coat',
@@ -219,7 +219,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 22,
         category: 'Women',
         imageUrl:
-          'https://images.unsplash.com/photo-1539533018447-63fcce2678a3?w=800',
+          'https://images.unsplash.com/photo-1539533113208-f6df8cc8b543?w=800',
       },
       {
         name: 'Leather Crossbody Bag',
@@ -229,7 +229,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 28,
         category: 'Accessories',
         imageUrl:
-          'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800',
+          'https://images.unsplash.com/photo-1718622795525-2295971921ba?w=800',
       },
       {
         name: 'Polarized Aviator Sunglasses',
@@ -239,7 +239,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 75,
         category: 'Accessories',
         imageUrl:
-          'https://images.unsplash.com/photo-1572635196233-159ce42f4b1d?w=800',
+          'https://images.unsplash.com/photo-1567473810954-507d59716c25?w=800',
       },
       {
         name: 'Merino Crew Sweater',
@@ -248,7 +248,7 @@ const sampleTenants: SeedTenant[] = [
         price: 69.99,
         stock: 40,
         category: 'Men',
-        imageUrl: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1604573824419-289a9a10672c?w=800',
       },
       {
         name: 'Performance Running Tee',
@@ -257,7 +257,7 @@ const sampleTenants: SeedTenant[] = [
         price: 34.99,
         stock: 60,
         category: 'Men',
-        imageUrl: 'https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1623285512357-ff3b9a7579ea?w=800',
       },
       {
         name: 'High-Rise Wide Leg Jeans',
@@ -266,7 +266,7 @@ const sampleTenants: SeedTenant[] = [
         price: 64.99,
         stock: 44,
         category: 'Women',
-        imageUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1616956455145-7c40e34a1c2a?w=800',
       },
       {
         name: 'Silk Blend Blouse',
@@ -275,7 +275,7 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 38,
         category: 'Women',
-        imageUrl: 'https://images.unsplash.com/photo-1548624149-f7b3e0c032d8?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1772855436877-3fe7489f4199?w=800',
       },
       {
         name: 'Canvas Belt Bag',
@@ -284,7 +284,7 @@ const sampleTenants: SeedTenant[] = [
         price: 39.0,
         stock: 55,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1707320184416-1f8bd31a4299?w=800',
       },
       {
         name: 'Wool Fedora Hat',
@@ -293,7 +293,7 @@ const sampleTenants: SeedTenant[] = [
         price: 55.0,
         stock: 30,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1534215754734-18e55d13e346?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=800',
       },
     ],
   },
@@ -320,7 +320,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 45,
         category: 'Kitchen',
         imageUrl:
-          'https://images.unsplash.com/photo-1603199506018-7ad0b9a531f6?w=800',
+          'https://images.unsplash.com/photo-1631008789162-950869f41805?w=800',
       },
       {
         name: 'Cast Iron Dutch Oven',
@@ -330,7 +330,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 32,
         category: 'Kitchen',
         imageUrl:
-          'https://images.unsplash.com/photo-1584990347499-4e6b909e66b3?w=800',
+          'https://images.unsplash.com/photo-1677274207889-8466cc7e2198?w=800',
       },
       {
         name: 'Minimal Arc Table Lamp',
@@ -340,7 +340,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 70,
         category: 'Decor',
         imageUrl:
-          'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800',
+          'https://images.unsplash.com/photo-1620812067822-899be8a6a9a7?w=800',
       },
       {
         name: 'Handwoven Wall Tapestry',
@@ -350,7 +350,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 40,
         category: 'Decor',
         imageUrl:
-          'https://images.unsplash.com/photo-1615529328331-f8917597711f?w=800',
+          'https://images.unsplash.com/photo-1580661485007-c7d629416f73?w=800',
       },
       {
         name: 'Velvet Lounge Chair',
@@ -360,7 +360,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 15,
         category: 'Furniture',
         imageUrl:
-          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800',
+          'https://images.unsplash.com/photo-1713441649678-b08feb0e4da6?w=800',
       },
       {
         name: 'Extendable Dining Table',
@@ -370,7 +370,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 10,
         category: 'Furniture',
         imageUrl:
-          'https://images.unsplash.com/photo-1617806112203-93e934b86a0a?w=800',
+          'https://images.unsplash.com/photo-1758977403826-01e2c8a3f68f?w=800',
       },
       {
         name: 'Stainless Knife Set (6pc)',
@@ -379,7 +379,7 @@ const sampleTenants: SeedTenant[] = [
         price: 79.99,
         stock: 28,
         category: 'Kitchen',
-        imageUrl: 'https://images.unsplash.com/photo-1593113630400-ea4288922497?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1577398628388-516477602b3b?w=800',
       },
       {
         name: 'Glass Food Storage Set',
@@ -388,7 +388,7 @@ const sampleTenants: SeedTenant[] = [
         price: 44.99,
         stock: 50,
         category: 'Kitchen',
-        imageUrl: 'https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1681146375786-07ca2c058ce1?w=800',
       },
       {
         name: 'Scented Candle Trio',
@@ -397,7 +397,7 @@ const sampleTenants: SeedTenant[] = [
         price: 32.0,
         stock: 65,
         category: 'Decor',
-        imageUrl: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1603905179139-db12ab535ca9?w=800',
       },
       {
         name: 'Ceramic Planter Set',
@@ -406,25 +406,25 @@ const sampleTenants: SeedTenant[] = [
         price: 28.5,
         stock: 48,
         category: 'Decor',
-        imageUrl: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1701270631258-ca1a2edbd9c5?w=800',
       },
       {
-        name: 'Oak Side Table',
+        name: 'Oak Table',
         description:
-          'Compact bedside or sofa table with a lower shelf for books and remotes.',
+          'Compact sofa table with a lower shelf for books and remotes.',
         price: 129.0,
         stock: 18,
         category: 'Furniture',
-        imageUrl: 'https://images.unsplash.com/photo-1532372320572-cda25653a26d?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1557784415-3bdc60b1c02b?w=800',
       },
       {
         name: 'Bookshelf Ladder 5-Tier',
         description:
-          'Leaning bookshelf in white oak veneer — ideal for living rooms and home offices.',
+          'Leaning bookshelf in black matte — ideal for living rooms and home offices.',
         price: 179.0,
         stock: 14,
         category: 'Furniture',
-        imageUrl: 'https://images.unsplash.com/photo-1594620302200-9a7b2241a43c?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1535905557558-afc4877a26fc?w=800',
       },
     ],
   },
@@ -451,7 +451,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 55,
         category: 'Running',
         imageUrl:
-          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800',
+          'https://images.unsplash.com/photo-1778617845293-d4ef3912a07e?w=800',
       },
       {
         name: 'Trail Grip Runners',
@@ -461,7 +461,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 38,
         category: 'Running',
         imageUrl:
-          'https://images.unsplash.com/photo-1606107557192-0be2ac7a8f2a?w=800',
+          'https://images.unsplash.com/photo-1761942028415-8e2a768592c9?w=800',
       },
       {
         name: 'Pro Yoga Mat 6mm',
@@ -471,7 +471,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 80,
         category: 'Training',
         imageUrl:
-          'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=800',
+          'https://images.unsplash.com/photo-1637157216470-d92cd2edb2e8?w=800',
       },
       {
         name: 'Adjustable Kettlebell Set',
@@ -481,7 +481,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 25,
         category: 'Training',
         imageUrl:
-          'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800',
+          'https://images.unsplash.com/photo-1632077804406-188472f1a810?w=800',
       },
       {
         name: 'Summit Hiking Backpack 40L',
@@ -491,7 +491,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 30,
         category: 'Outdoor',
         imageUrl:
-          'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800',
+          'https://images.unsplash.com/photo-1611322469983-a1566bc25fa9?w=800',
       },
       {
         name: 'Insulated Hydration Pack',
@@ -501,7 +501,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 42,
         category: 'Outdoor',
         imageUrl:
-          'https://images.unsplash.com/photo-1622260614153-5326d63f1f29?w=800',
+          'https://images.unsplash.com/photo-1621786875634-d3e2fa4101f7?w=800',
       },
       {
         name: 'Marathon Racing Flats',
@@ -510,7 +510,7 @@ const sampleTenants: SeedTenant[] = [
         price: 179.99,
         stock: 32,
         category: 'Running',
-        imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1547941126-3d5322b218b0?w=800',
       },
       {
         name: 'Recovery Slide Sandals',
@@ -519,7 +519,7 @@ const sampleTenants: SeedTenant[] = [
         price: 39.99,
         stock: 60,
         category: 'Running',
-        imageUrl: 'https://images.unsplash.com/photo-1603808033192-082d6f74b30d?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1633281651728-b7f0bd1f3eaa?w=800',
       },
       {
         name: 'Resistance Band Set',
@@ -528,7 +528,7 @@ const sampleTenants: SeedTenant[] = [
         price: 24.99,
         stock: 90,
         category: 'Training',
-        imageUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800',
       },
       {
         name: 'Foam Roller Pro',
@@ -537,7 +537,7 @@ const sampleTenants: SeedTenant[] = [
         price: 29.99,
         stock: 55,
         category: 'Training',
-        imageUrl: 'https://images.unsplash.com/photo-1600881333168-2ef49b341f30?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1591741535585-9c4f52b3f13f?w=800',
       },
       {
         name: 'Camping Headlamp',
@@ -546,7 +546,7 @@ const sampleTenants: SeedTenant[] = [
         price: 34.0,
         stock: 48,
         category: 'Outdoor',
-        imageUrl: 'https://images.unsplash.com/photo-1508873535684-277a3cbcc4e8?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1630275383125-2ecfa5f431d5?w=800',
       },
       {
         name: 'Trekking Poles (Pair)',
@@ -555,7 +555,7 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 36,
         category: 'Outdoor',
-        imageUrl: 'https://images.unsplash.com/photo-1533240332313-0db49b439ad3?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1776006534692-2c35e298732a?w=800',
       },
     ],
   },
@@ -592,7 +592,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 65,
         category: 'Pantry',
         imageUrl:
-          'https://images.unsplash.com/photo-1603046891705-3b0a6f7e0c8f?w=800',
+          'https://images.unsplash.com/photo-1499126167718-c87f5c1387e8?w=800',
       },
       {
         name: 'Single-Origin Coffee Beans',
@@ -612,7 +612,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 50,
         category: 'Beverages',
         imageUrl:
-          'https://images.unsplash.com/photo-1515823064-6117568612-9a0c5b3c0f0e?w=800',
+          'https://images.unsplash.com/photo-1565117711038-1e0a80eed005?w=800',
       },
       {
         name: 'Artisan Chocolate Gift Box',
@@ -622,7 +622,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 40,
         category: 'Gifts',
         imageUrl:
-          'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=800',
+          'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=800',
       },
       {
         name: 'Gourmet Spice Collection',
@@ -632,7 +632,7 @@ const sampleTenants: SeedTenant[] = [
         stock: 35,
         category: 'Gifts',
         imageUrl:
-          'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800',
+          'https://images.unsplash.com/photo-1591272216626-b09e38519371?w=800',
       },
       {
         name: 'Truffle Infused Honey',
@@ -641,7 +641,7 @@ const sampleTenants: SeedTenant[] = [
         price: 22.0,
         stock: 40,
         category: 'Pantry',
-        imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1654515722385-c684c5331c04?w=800',
       },
       {
         name: 'Sourdough Bread Mix',
@@ -650,7 +650,7 @@ const sampleTenants: SeedTenant[] = [
         price: 12.5,
         stock: 75,
         category: 'Pantry',
-        imageUrl: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800',
       },
       {
         name: 'Sparkling Elderflower',
@@ -659,7 +659,7 @@ const sampleTenants: SeedTenant[] = [
         price: 8.99,
         stock: 100,
         category: 'Beverages',
-        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1588184069951-e8a1c47be70f?w=800',
       },
       {
         name: 'Cold Brew Concentrate',
@@ -668,7 +668,7 @@ const sampleTenants: SeedTenant[] = [
         price: 14.99,
         stock: 55,
         category: 'Beverages',
-        imageUrl: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1591260201798-e714889b17f3?w=800',
       },
       {
         name: 'Gourmet Nut Gift Tin',
@@ -677,7 +677,7 @@ const sampleTenants: SeedTenant[] = [
         price: 29.99,
         stock: 42,
         category: 'Gifts',
-        imageUrl: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1769255484646-16988ad5552d?w=800',
       },
       {
         name: 'Artisan Jam Trio',
@@ -686,7 +686,7 @@ const sampleTenants: SeedTenant[] = [
         price: 26.0,
         stock: 38,
         category: 'Gifts',
-        imageUrl: 'https://images.unsplash.com/photo-1538332576228-eb5b43a6985a?w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1618680705029-96d0af7e24ca?w=800',
       },
     ],
   },
@@ -765,7 +765,7 @@ async function main() {
         .replace(/^-|-$/g, '');
       const imageUrl =
         product.imageUrl.includes('picsum.photos') ||
-        product.imageUrl.includes('unsplash.com')
+          product.imageUrl.includes('unsplash.com')
           ? product.imageUrl
           : productImage(tenantData.slug, imageKey);
 
