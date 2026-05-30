@@ -1,6 +1,6 @@
 # Jerry Store — Platformë E-Commerce me Shumë Dyqane
 
-Projekt universitar për lëndën **Sistemet e Shperndara**. Platforma ofron një dyqan online me arkitekturë multi-tenant: disa dyqane të pavarura në një sistem të vetëm, me backend të ndarë, cache Redis dhe përpunim asinkron të email-eve.
+Projekt universitar për lëndën **Sistemet e Shperndara**. Platforma ofron një dyqan online me arkitekturë multi-tenant.
 
 ---
 
@@ -66,8 +66,6 @@ VITE_API_URL=http://localhost:3000
 
 ### 5. Hyrje demo (pas seed)
 
-Fjalëkalimi për të gjithë përdoruesit e seed-it: **`useruser`**
-
 | Dyqani | URL | Shembull klienti |
 |--------|-----|------------------|
 | Tech Store | [/tech-store](http://localhost:5173/tech-store) | `customer@tech-store.local` |
@@ -76,7 +74,7 @@ Fjalëkalimi për të gjithë përdoruesit e seed-it: **`useruser`**
 | Sports World | [/sports-world](http://localhost:5173/sports-world) | `customer@sports-world.local` |
 | Gourmet Pantry | [/gourmet-pantry](http://localhost:5173/gourmet-pantry) | `customer@gourmet-pantry.local` |
 
-Admin i dyqanit: email **`admin`** (i njëjti fjalëkalim `useruser`).
+Admin i dyqanit: tenant-url/admin 
 
 Faqja kryesore e zgjedhjes së dyqanit: [http://localhost:5173/](http://localhost:5173/) (**Jerry Store**).
 
@@ -98,7 +96,7 @@ Aspektet që lidhen me **sistemet e shperndara**:
 
 - **Shumë tenantë** në një aplikacion të vetëm, me izolim logjik të të dhënave sipas `tenantId`
 - **PostgreSQL** si magazinë qendrore e të dhënave (Prisma ORM)
-- **Redis** për cache të produkteve dhe (opsionalisht) radhë **BullMQ** për dërgimin asinkron të email-eve të porosisë
+- **Redis** për cache të produkteve dhe (opsionalisht) queue **BullMQ** për dërgimin asinkron të email-eve të porosisë
 - **API REST** me autentifikim JWT dhe dokumentim Swagger
 - **Frontend** React që komunikon me backend-in përmes HTTP; mbështet edhe modalitet demo me të dhëna mock
 
@@ -122,13 +120,14 @@ Funksionalitete kryesore: regjistrim/hyrje për klient dhe admin, katalog produk
 
 ## Ekipi
 
-| # | Emri | Roli / Kontributi |
-|---|------|-------------------|
-| 1 | *[Emri i anëtarit 1]* | *[p.sh. Backend, DevOps]* |
-| 2 | *[Emri i anëtarit 2]* | *[p.sh. Frontend, UI]* |
-| 3 | *[Emri i anëtarit 3]* | *[p.sh. Databazë, testim]* |
-| 4 | *[Emri i anëtarit 4]* | *[opsional]* |
+| # | Emri | 
+|---|------|
+| 1 | *Jon Rexha* | 
+| 2 | *Leart Balidemaj* | 
+| 3 | *Lorik Agaj* | 
+| 4 | *Mehmed Koçinaj* | 
+| 5 | *Rudina Bulliqi* | 
 
 ---
 
-*Universitet — Lënda: Sistemet e Shperndara*
+*Universiteti i Prishtinës— Lënda: Sistemet e Shperndara*
