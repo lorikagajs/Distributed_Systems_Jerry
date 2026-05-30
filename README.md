@@ -1,127 +1,134 @@
-<<<<<<< HEAD
-# Distributed_Systems_Jerry
+# Jerry Store — Platformë E-Commerce me Shumë Dyqane
 
-Multi-tenant e-commerce app ([GitHub repo](https://github.com/lorikagajs/Distributed_Systems_Jerry)).
+Projekt universitar për lëndën **Sistemet e Shperndara**. Platforma ofron një dyqan online me arkitekturë multi-tenant: disa dyqane të pavarura në një sistem të vetëm, me backend të ndarë, cache Redis dhe përpunim asinkron të email-eve.
 
-## Quick start
+---
 
-### 1. Database (Docker)
+## Si ta nisni projektin
 
-Start Docker Desktop, then:
+### Kërkesat paraprake
+
+- [Node.js](https://nodejs.org/) (v18 ose më i ri)
+- [npm](https://www.npmjs.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (për PostgreSQL dhe Redis)
+
+### 1. Klonimi
+
+```bash
+git clone https://github.com/lorikagajs/Distributed_Systems_Jerry.git
+cd Distributed_Systems_Jerry
+```
+
+### 2. Baza e të dhënave dhe Redis (Docker)
+
+Nisni Docker Desktop, pastaj:
 
 ```bash
 docker compose up -d
 ```
 
-Postgres: `jerry` / `jerry_secret` on `localhost:5432`, database `jerry_ecommerce`.
+- **PostgreSQL:** `localhost:5432` — përdoruesi `jerry`, fjalëkalimi `jerry_secret`, databaza `jerry_ecommerce`
+- **Redis:** `localhost:6379` (opsional për cache dhe radhën e email-eve)
 
-### 2. Backend
+### 3. Backend (NestJS)
 
 ```bash
 cd backend
 cp .env.example .env
 npm install
 npx prisma migrate deploy
-npm run seed
+npx prisma db seed
 npm run start:dev
 ```
 
-API: http://localhost:3000 — Swagger: http://localhost:3000/api/docs
+API: [http://localhost:3000](http://localhost:3000)  
+Dokumentimi Swagger: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
 
-### 3. Frontend
+Përditësoni `.env` sipas nevojës (JWT, SMTP për email konfirmimi porosie, Cloudinary për imazhe, etj.). Shikoni `backend/.env.example` për të gjitha variablat.
+
+### 4. Frontend (React + Vite)
 
 ```bash
 cd frontent
+cp .env.example .env.development
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Hapni [http://localhost:5173](http://localhost:5173)
 
-`.env.development` must include:
+Në `.env.development` vendosni:
 
-```
+```env
 VITE_USE_MOCK_DATA=false
 VITE_API_URL=http://localhost:3000
 ```
 
-### 4. Try a store
+### 5. Hyrje demo (pas seed)
 
-Seeded tenant slugs:
+Fjalëkalimi për të gjithë përdoruesit e seed-it: **`useruser`**
 
-- `tech-store` → http://localhost:5173/tech-store
-- `fashion-hub` → http://localhost:5173/fashion-hub
-- `home-goods` → http://localhost:5173/home-goods
-- `sports-world` → http://localhost:5173/sports-world
+| Dyqani | URL | Shembull klienti |
+|--------|-----|------------------|
+| Tech Store | [/tech-store](http://localhost:5173/tech-store) | `customer@tech-store.local` |
+| Fashion Hub | [/fashion-hub](http://localhost:5173/fashion-hub) | `customer@fashion-hub.local` |
+| Home & Living | [/home-goods](http://localhost:5173/home-goods) | `customer@home-goods.local` |
+| Sports World | [/sports-world](http://localhost:5173/sports-world) | `customer@sports-world.local` |
+| Gourmet Pantry | [/gourmet-pantry](http://localhost:5173/gourmet-pantry) | `customer@gourmet-pantry.local` |
 
-Register at `/tech-store/register` (password min. **8** characters).
+Admin i dyqanit: email **`admin`** (i njëjti fjalëkalim `useruser`).
 
-## How frontend connects to backend
+Faqja kryesore e zgjedhjes së dyqanit: [http://localhost:5173/](http://localhost:5173/) (**Jerry Store**).
 
-| Feature | Frontend | Backend |
-|--------|----------|---------|
-| Store list | `GET /tenants` | Public tenants list |
-| Store config | `GET /tenants/:slug/config` | Theme + `tenantId` for auth |
-| Register / login | `POST /auth/register`, `POST /auth/login` | Body includes `tenantId` |
-| Products, cart, orders | `GET /products`, etc. | `?tenantId=` from `TenantContext` |
+### (Opsionale) Git hooks
 
-Routes use `/:tenantSlug/...` in the UI; API calls send `tenantId` as a query parameter (not `/jerry/` in the API path).
-=======
-# Distributed Systems - Jerry E-Commerce Platform
+Për të shmangur commit aksidental të skedarëve `.env`:
 
-Një platformë dyqani online (E-Commerce) e thjeshtë dhe intuitive që u mundëson përdoruesve të eksplorojnë produkte të ndryshme në mënyrë të lehtë dhe të organizuar. Ky projekt është zhvilluar në kuadër të lëndës **Sistemet e Shpërndara (Distributed Systems)**, duke synuar të ofrojë një eksperiencë të shpejtë dhe të këndshme blerjeje.
+```powershell
+.\scripts\setup-git-hooks.ps1
+```
 
 ---
 
-## 🚀 Karakteristikat Kryesore (Features)
+## Çfarë është ky projekt?
 
-* **Eksplorimi i Produkteve:** Navigim i thjeshtë dhe i organizuar i produkteve sipas kategorive.
-* **Arkitekturë e Shpërndarë:** Ndërtuar me parimet e sistemeve të shpërndara për të siguruar disponueshmëri dhe performancë të lartë.
-* **Ndërfaqe Intuitive (UI/UX):** Eksperiencë përdoruesi e pastër, e shpejtë dhe moderne.
-* **Menaxhimi i Shportës:** Mundësi për të shtuar, modifikuar dhe hequr produkte nga shporta në kohë reale.
+**Jerry Store** është një platformë e-commerce **multi-tenant**: çdo dyqan (tenant) ka katalogun, përdoruesit, porositë dhe temën e vet, ndërsa ndan të njëjtin backend dhe databazë. Përdoruesi zgjedh dyqanin në faqen kryesore, pastaj blen produkte, menaxhon shportën, vendos porosi dhe lë vlerësime — administratorët menaxhojnë produktet dhe porositë nga paneli i adminit.
+
+Aspektet që lidhen me **sistemet e shperndara**:
+
+- **Shumë tenantë** në një aplikacion të vetëm, me izolim logjik të të dhënave sipas `tenantId`
+- **PostgreSQL** si magazinë qendrore e të dhënave (Prisma ORM)
+- **Redis** për cache të produkteve dhe (opsionalisht) radhë **BullMQ** për dërgimin asinkron të email-eve të porosisë
+- **API REST** me autentifikim JWT dhe dokumentim Swagger
+- **Frontend** React që komunikon me backend-in përmes HTTP; mbështet edhe modalitet demo me të dhëna mock
+
+Funksionalitete kryesore: regjistrim/hyrje për klient dhe admin, katalog produktesh me kategori, galeri imazhesh, shportë, porosi me pagesë/dërgesë, vlerësime, listë dëshirash, email konfirmimi porosie, panel administrimi.
+
+### Struktura e repozitorit
+
+| Dosja | Përshkrimi |
+|-------|------------|
+| `backend/` | API NestJS, Prisma, seed, email, cache |
+| `frontent/` | UI React (Vite, Tailwind) |
+| `docker-compose.yml` | PostgreSQL + Redis lokale |
+| `scripts/` | Utilitete (p.sh. git hooks) |
+
+### Stack teknologjik
+
+- **Backend:** NestJS, TypeScript, Prisma, PostgreSQL, Redis, BullMQ, JWT, Nodemailer, Cloudinary  
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, React Router, Axios  
 
 ---
 
-## 🛠️ Teknologzitë e Përdorura (Tech Stack)
+## Ekipi
 
-Projekti bazohet në teknologjitë moderne për zhvillimin e aplikacioneve të shpërndara dhe të shkallëzueshme:
-
-* **Backend:** Node.js / Typescript
-* **Frontend:** React.js / Typescript
-* **Database:** PostgreSQL
+| # | Emri | Roli / Kontributi |
+|---|------|-------------------|
+| 1 | *[Emri i anëtarit 1]* | *[p.sh. Backend, DevOps]* |
+| 2 | *[Emri i anëtarit 2]* | *[p.sh. Frontend, UI]* |
+| 3 | *[Emri i anëtarit 3]* | *[p.sh. Databazë, testim]* |
+| 4 | *[Emri i anëtarit 4]* | *[opsional]* |
 
 ---
 
-## 💻 Konfigurimi dhe Instalimi (Setup & Installation)
-
-Ndiqni hapat e mëposhtëm për të klonuar, konfiguruar dhe ekzekutuar projektin në mjedisin tuaj lokal:
-
-### 1. Klonimi i Repozitorit
-git clone [https://github.com/lorikagajs/Distributed_Systems_Jerry.git](https://github.com/lorikagajs/Distributed_Systems_Jerry.git)
-cd Distributed_Systems_Jerry
-
-# Navigoni te direktoria e backend-it
-cd backend
-
-# Instaloni të gjitha varësitë e nevojshme (dependencies)
-npm install
-
-# Krijoni skedarin e konfigurimit të mjedisit (.env)
-# Ndryshoni vlerat sipas konfigurimit tuaj lokal (Porta, Lidhja me Databazën, etj.)
-cp .env.example .env
-
-# Nisni serverin në mjedisin e zhvillimit (Development Mode)
-npm run dev
-
-# Ose nisni serverin në mjedisin e prodhimit (Production Mode)
-npm start
-
-# Navigoni te direktoria e frontend-it
-cd ../frontend
-
-# Instaloni varësitë e nevojshme për ndërfaqen
-npm install
-
-# Nisni aplikacionin e frontend-it
-npm start
->>>>>>> 92a3d75f410de3d6b3277942d48de6734ce69824
+*Universitet — Lënda: Sistemet e Shperndara*
