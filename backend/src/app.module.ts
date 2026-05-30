@@ -10,6 +10,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { TenantMiddleware } from './tenants/tenant.middleware';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
@@ -105,6 +106,6 @@ import { AiModule } from './ai/ai.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*');
+    consumer.apply(LoggingMiddleware, TenantMiddleware).forRoutes('*');
   }
 }

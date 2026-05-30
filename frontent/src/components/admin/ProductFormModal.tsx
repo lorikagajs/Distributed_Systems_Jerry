@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Sparkles, X } from 'lucide-react';
 import { getApiErrorMessage } from '../../api/auth';
+import { generateProductDescription } from '../../api/ai';
 import {
   createProduct,
   updateProduct,
@@ -41,6 +42,7 @@ export function ProductFormModal({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const submittingRef = useRef(false);
   /** Set when create succeeded but image upload failed — avoids duplicate products on retry. */
   const pendingProductIdRef = useRef<number | null>(null);
@@ -69,6 +71,7 @@ export function ProductFormModal({
     }
     setImageFiles([]);
     setError('');
+    setGenerating(false);
     pendingProductIdRef.current = null;
   }, [open, product, categories]);
 
@@ -76,7 +79,7 @@ export function ProductFormModal({
     if (!open) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !saving) onClose();
+      if (e.key === 'Escape' && !saving && !generating) onClose();
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -87,7 +90,39 @@ export function ProductFormModal({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, saving, onClose]);
+  }, [open, saving, generating, onClose]);
+
+  const handleGenerateDescription = async () => {
+    const name = form.name.trim();
+    const category = categories.find(
+      (c) => String(c.id) === form.categoryId,
+    )?.name;
+
+    if (!name) {
+      setError('Enter a product name before generating a description.');
+      return;
+    }
+    if (!category) {
+      setError('Select a category before generating a description.');
+      return;
+    }
+
+    setError('');
+    setGenerating(true);
+    try {
+      const description = await generateProductDescription(name, category);
+      setForm((f) => ({ ...f, description }));
+    } catch (err) {
+      setError(
+        getApiErrorMessage(
+          err,
+          'Could not generate a description. Make sure AI is configured and try again.',
+        ),
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -211,17 +246,40 @@ export function ProductFormModal({
           </div>
 
           <div>
-            <label htmlFor="product-description" className="block text-sm font-medium text-gray-700">
-              Description
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label
+                htmlFor="product-description"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Description
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateDescription}
+                disabled={saving || generating}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-primary)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Generate a description from the product name and category"
+              >
+                {generating ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Sparkles className="size-3.5" aria-hidden />
+                )}
+                {generating ? 'Generating…' : 'Generate with AI'}
+              </button>
+            </div>
             <textarea
               id="product-description"
               rows={4}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Supports plain text or markdown"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20"
+              disabled={generating}
+              placeholder="Supports plain text or markdown — or click “Generate with AI”."
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 disabled:bg-gray-50"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              AI uses the product name and selected category.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -333,14 +391,14 @@ export function ProductFormModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || generating}
               className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={saving || categories.length === 0}
+              disabled={saving || generating || categories.length === 0}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}

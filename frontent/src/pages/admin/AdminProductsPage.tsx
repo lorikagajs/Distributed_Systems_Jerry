@@ -280,7 +280,7 @@ export function AdminProductsPage() {
         product={editingProduct}
         categories={categories}
         onClose={() => setFormOpen(false)}
-        onSaved={(saved) => {
+        onSaved={() => {
           showToast('success', editingProduct ? 'Product updated.' : 'Product created.');
           void loadData();
         }}

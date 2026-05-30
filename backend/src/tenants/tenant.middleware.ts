@@ -18,6 +18,7 @@ const API_RESOURCE_PREFIXES = new Set([
   'reviews',
   'coupons',
   'wishlist',
+  'ai',
 ]);
 
 @Injectable()
