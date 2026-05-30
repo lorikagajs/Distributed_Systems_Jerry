@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Store } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { getAllTenants, type TenantListItem } from '../api/tenants';
+import { TenantBannerImage } from '../components/tenant/TenantBannerImage';
 import { getApiErrorMessage } from '../api/auth';
 import { isMockMode } from '../config/env';
 import { useTenant } from '../context/TenantContext';
@@ -29,7 +30,7 @@ export function TenantSelectorPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">ShopHub</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Jerry Store</h1>
           <p className="mt-2 text-gray-600">
             Choose a store to start shopping
           </p>
@@ -72,19 +73,13 @@ export function TenantSelectorPage() {
                 to={`/${store.slug}/`}
                 className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
               >
-                <div
-                  className="flex h-28 items-center justify-center"
-                  style={{ backgroundColor: store.primaryColor }}
-                >
-                  {store.bannerUrl ? (
-                    <img
-                      src={store.bannerUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Store className="size-12 text-white/90" aria-hidden />
-                  )}
+                <div className="h-28 overflow-hidden">
+                  <TenantBannerImage
+                    src={store.bannerUrl}
+                    className="h-full w-full object-cover"
+                    fallbackColor={store.primaryColor}
+                    showFallbackIcon
+                  />
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-3">

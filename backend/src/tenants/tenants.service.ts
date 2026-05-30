@@ -23,7 +23,10 @@ export class TenantsService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.tenant.findMany();
+    return this.prisma.tenant.findMany({
+      where: { isActive: true },
+      orderBy: { storeName: 'asc' },
+    });
   }
 
   findOne(id: number) {

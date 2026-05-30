@@ -1,16 +1,188 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  Prisma,
+  PrismaClient,
+  ShippingStatus,
+  UserRole,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 10;
-const DEMO_PASSWORD = 'Password123!';
+const SEED_PASSWORD_PLAINTEXT = 'useruser';
 const ADMIN_LOGIN = 'admin';
-const ADMIN_PASSWORD = 'adminadmin';
+const MIN_PRODUCTS_PER_CATEGORY = 10;
+const IMAGES_PER_PRODUCT_MIN = 3;
+const IMAGES_PER_PRODUCT_MAX = 4;
+const REVIEWS_PER_PRODUCT_MIN = 3;
+const REVIEWS_PER_PRODUCT_MAX = 4;
+const EXTRA_CUSTOMERS_PER_TENANT = 4;
 
-/** Stable product images (picsum seeds avoid broken Unsplash links). */
-function productImage(tenantSlug: string, key: string): string {
-  const seed = `${tenantSlug}-${key}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  return `https://picsum.photos/seed/${seed}/800/800`;
+/** Legacy tenants removed from the database on every seed run. */
+const DELETED_TENANT_SLUGS = ['university-a', 'uni-a'] as const;
+const DELETED_TENANT_NAMES = ['University A'] as const;
+
+/** Tenants excluded from seed generation (deactivated if still present). */
+const EXCLUDED_TENANT_NAMES = new Set(['Company A']);
+const EXCLUDED_TENANT_SLUGS = new Set(['company-a']);
+
+/** Stable Unsplash photo ids — format: https://images.unsplash.com/{id}?auto=format&fit=crop&w=600&q=80 */
+const STABLE_UNSPLASH_PHOTOS = [
+  'photo-1611186871348-b1ce696e52c9',
+  'photo-1491933382434-500287f9b54b',
+  'photo-1523275335684-37898b6baf30',
+  'photo-1505740420928-5e560c06d30e',
+  'photo-1572635196237-14b640f5882c',
+  'photo-1560472354-b33ff0c03a26',
+  'photo-1542291026-7eec264c27ff',
+  'photo-1521572163474-6864f9cf17ab',
+  'photo-1556906788-dcaef4a69ed2',
+  'photo-1586023492125-27b2c045efd7',
+  'photo-1441986300917-64674bd600e8',
+  'photo-1511130558090-00af810c21b1',
+  'photo-1461896836934-ffe607ba8211',
+  'photo-1414235077428-338989a2e8c0',
+  'photo-1474979266404-7eaacbcd87c5',
+  'photo-1481391319762-47dff72954d9',
+  'photo-1595044426077-d36d9236d54a',
+  'photo-1623949556303-b0d17d198863',
+  'photo-1630794180018-433d915c34ac',
+  'photo-1610945265064-0e34e5519bbf',
+];
+
+function unsplashUrl(photoId: string, width = 600): string {
+  const id = photoId.startsWith('photo-') ? photoId : `photo-${photoId}`;
+  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=80`;
+}
+
+/** Wide hero banners — same host/query style as working product/logo URLs in this seed. */
+function unsplashBannerUrl(photoId: string): string {
+  const id = photoId.startsWith('photo-') ? photoId : `photo-${photoId}`;
+  return `https://images.unsplash.com/${id}?w=1200&h=400&fit=crop&q=80`;
+}
+
+/** Verified Unsplash ids (distinct from each tenant logo where possible). */
+const TENANT_BANNER_BY_SLUG: Record<string, string> = {
+  'tech-store': unsplashBannerUrl('photo-1611186871348-b1ce696e52c9'),
+  'fashion-hub': unsplashBannerUrl('photo-1521572163474-6864f9cf17ab'),
+  'home-goods': unsplashBannerUrl('photo-1623949556303-b0d17d198863'),
+  'sports-world': unsplashBannerUrl('photo-1542291026-7eec264c27ff'),
+  'gourmet-pantry': unsplashBannerUrl('photo-1474979266404-7eaacbcd87c5'),
+};
+
+function normalizeToUnsplash(url: string): string {
+  if (url.includes('images.unsplash.com')) {
+    const match = url.match(/photo-[a-zA-Z0-9-]+/);
+    if (match) {
+      return unsplashUrl(match[0]);
+    }
+  }
+  return url;
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function buildProductImageGallery(
+  tenantSlug: string,
+  productName: string,
+  primaryImageUrl: string,
+): { url: string; isPrimary: boolean }[] {
+  const baseHash = hashString(`${tenantSlug}:${productName}`);
+  const count =
+    IMAGES_PER_PRODUCT_MIN +
+    (baseHash % (IMAGES_PER_PRODUCT_MAX - IMAGES_PER_PRODUCT_MIN + 1));
+  const primary = normalizeToUnsplash(primaryImageUrl);
+  const images: { url: string; isPrimary: boolean }[] = [
+    { url: primary, isPrimary: true },
+  ];
+
+  for (let i = 1; i < count; i++) {
+    const photoId =
+      STABLE_UNSPLASH_PHOTOS[(baseHash + i * 7) % STABLE_UNSPLASH_PHOTOS.length];
+    const url = unsplashUrl(photoId);
+    if (!images.some((img) => img.url === url)) {
+      images.push({ url, isPrimary: false });
+    }
+  }
+
+  while (images.length < IMAGES_PER_PRODUCT_MIN) {
+    const photoId =
+      STABLE_UNSPLASH_PHOTOS[
+        (baseHash + images.length * 11) % STABLE_UNSPLASH_PHOTOS.length
+      ];
+    const url = unsplashUrl(photoId);
+    if (!images.some((img) => img.url === url)) {
+      images.push({ url, isPrimary: false });
+    }
+  }
+
+  return images;
+}
+
+function enrichProductDescription(
+  productName: string,
+  description: string,
+  storeName: string,
+): string {
+  if (description.includes('##') || description.includes('\n\n-')) {
+    return description;
+  }
+  return [
+    `## ${productName}`,
+    '',
+    description,
+    '',
+    '### Highlights',
+    '- Quality-checked before dispatch',
+    '- Backed by our store support team',
+    '- Suitable for everyday use or gifting',
+    '',
+    `*Available from **${storeName}***`,
+  ].join('\n');
+}
+
+function densifyTenantCatalog(tenant: SeedTenant): SeedTenant {
+  const products = [...tenant.products];
+  for (const category of tenant.categories) {
+    const inCategory = products.filter((p) => p.category === category);
+    const need = MIN_PRODUCTS_PER_CATEGORY - inCategory.length;
+    for (let i = 0; i < need; i++) {
+      const index = inCategory.length + i + 1;
+      const photoId =
+        STABLE_UNSPLASH_PHOTOS[
+          hashString(`${tenant.slug}:${category}:${index}`) %
+            STABLE_UNSPLASH_PHOTOS.length
+        ];
+      products.push({
+        name: `${category} Collection ${index}`,
+        description: [
+          `## ${category} — curated pick ${index}`,
+          '',
+          `Designed for **${tenant.storeName}** shoppers who want reliable quality without compromise.`,
+          '',
+          '- Premium materials and consistent sizing',
+          '- Backed by our store satisfaction policy',
+          '- Ideal for everyday use or gifting',
+          '',
+          `> Ships from our ${tenant.name} warehouse with tracked delivery.`,
+        ].join('\n'),
+        price: Number((19.99 + index * 7.5 + hashString(category) % 40).toFixed(2)),
+        stock: 20 + (index % 35),
+        category,
+        imageUrl: unsplashUrl(photoId),
+      });
+    }
+  }
+  return { ...tenant, products };
 }
 
 type SeedProduct = {
@@ -48,8 +220,7 @@ const sampleTenants: SeedTenant[] = [
     secondaryColor: '#7c3aed',
     logoUrl:
       'https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=200&h=200&fit=crop',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1491933382434-500287f9b54b?w=1200',
+    bannerUrl: TENANT_BANNER_BY_SLUG['tech-store'],
     categories: ['Laptops', 'Phones', 'Accessories'],
     products: [
       {
@@ -59,7 +230,8 @@ const sampleTenants: SeedTenant[] = [
         price: 1299.99,
         stock: 25,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=800',
       },
       {
         name: 'UltraBook Air 13"',
@@ -68,7 +240,8 @@ const sampleTenants: SeedTenant[] = [
         price: 999.0,
         stock: 30,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1625766763788-95dcce9bf5ac?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1625766763788-95dcce9bf5ac?w=800',
       },
       {
         name: 'Asus Gaming 17"',
@@ -77,7 +250,8 @@ const sampleTenants: SeedTenant[] = [
         price: 1899.99,
         stock: 12,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1630794180018-433d915c34ac?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1630794180018-433d915c34ac?w=800',
       },
       {
         name: 'Student Chromebook 14"',
@@ -86,7 +260,8 @@ const sampleTenants: SeedTenant[] = [
         price: 449.99,
         stock: 45,
         category: 'Laptops',
-        imageUrl: 'https://images.unsplash.com/photo-1616499452581-cc7f8e3dd3c9?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1616499452581-cc7f8e3dd3c9?w=800',
       },
       {
         name: 'Galaxy Ultra Phone',
@@ -135,7 +310,8 @@ const sampleTenants: SeedTenant[] = [
         price: 1199.0,
         stock: 20,
         category: 'Phones',
-        imageUrl: 'https://images.unsplash.com/photo-1592813630413-1124aa567638?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1592813630413-1124aa567638?w=800',
       },
       {
         name: 'Budget Smart 5G',
@@ -144,7 +320,8 @@ const sampleTenants: SeedTenant[] = [
         price: 299.99,
         stock: 70,
         category: 'Phones',
-        imageUrl: 'https://images.unsplash.com/photo-1653629213421-83a13907003f?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1653629213421-83a13907003f?w=800',
       },
       {
         name: 'USB-C Hub 7-in-1',
@@ -153,7 +330,8 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 85,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1760376789487-994070337c76?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1760376789487-994070337c76?w=800',
       },
       {
         name: '4K Webcam Pro',
@@ -162,7 +340,8 @@ const sampleTenants: SeedTenant[] = [
         price: 79.99,
         stock: 55,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1623949556303-b0d17d198863?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1623949556303-b0d17d198863?w=800',
       },
     ],
   },
@@ -177,8 +356,7 @@ const sampleTenants: SeedTenant[] = [
     secondaryColor: '#9d174d',
     logoUrl:
       'https://images.unsplash.com/photo-1445205170230-053b83016050?w=200&h=200&fit=crop',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200',
+    bannerUrl: TENANT_BANNER_BY_SLUG['fashion-hub'],
     categories: ['Men', 'Women', 'Accessories'],
     products: [
       {
@@ -248,7 +426,8 @@ const sampleTenants: SeedTenant[] = [
         price: 69.99,
         stock: 40,
         category: 'Men',
-        imageUrl: 'https://images.unsplash.com/photo-1604573824419-289a9a10672c?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1604573824419-289a9a10672c?w=800',
       },
       {
         name: 'Performance Running Tee',
@@ -257,7 +436,8 @@ const sampleTenants: SeedTenant[] = [
         price: 34.99,
         stock: 60,
         category: 'Men',
-        imageUrl: 'https://images.unsplash.com/photo-1623285512357-ff3b9a7579ea?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1623285512357-ff3b9a7579ea?w=800',
       },
       {
         name: 'High-Rise Wide Leg Jeans',
@@ -266,7 +446,8 @@ const sampleTenants: SeedTenant[] = [
         price: 64.99,
         stock: 44,
         category: 'Women',
-        imageUrl: 'https://images.unsplash.com/photo-1616956455145-7c40e34a1c2a?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1616956455145-7c40e34a1c2a?w=800',
       },
       {
         name: 'Silk Blend Blouse',
@@ -275,7 +456,8 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 38,
         category: 'Women',
-        imageUrl: 'https://images.unsplash.com/photo-1772855436877-3fe7489f4199?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1772855436877-3fe7489f4199?w=800',
       },
       {
         name: 'Canvas Belt Bag',
@@ -284,7 +466,8 @@ const sampleTenants: SeedTenant[] = [
         price: 39.0,
         stock: 55,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1707320184416-1f8bd31a4299?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1707320184416-1f8bd31a4299?w=800',
       },
       {
         name: 'Wool Fedora Hat',
@@ -293,7 +476,8 @@ const sampleTenants: SeedTenant[] = [
         price: 55.0,
         stock: 30,
         category: 'Accessories',
-        imageUrl: 'https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=800',
       },
     ],
   },
@@ -308,8 +492,7 @@ const sampleTenants: SeedTenant[] = [
     secondaryColor: '#047857',
     logoUrl:
       'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=200&h=200&fit=crop',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200',
+    bannerUrl: TENANT_BANNER_BY_SLUG['home-goods'],
     categories: ['Kitchen', 'Decor', 'Furniture'],
     products: [
       {
@@ -379,7 +562,8 @@ const sampleTenants: SeedTenant[] = [
         price: 79.99,
         stock: 28,
         category: 'Kitchen',
-        imageUrl: 'https://images.unsplash.com/photo-1577398628388-516477602b3b?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1577398628388-516477602b3b?w=800',
       },
       {
         name: 'Glass Food Storage Set',
@@ -388,7 +572,8 @@ const sampleTenants: SeedTenant[] = [
         price: 44.99,
         stock: 50,
         category: 'Kitchen',
-        imageUrl: 'https://images.unsplash.com/photo-1681146375786-07ca2c058ce1?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1681146375786-07ca2c058ce1?w=800',
       },
       {
         name: 'Scented Candle Trio',
@@ -397,7 +582,8 @@ const sampleTenants: SeedTenant[] = [
         price: 32.0,
         stock: 65,
         category: 'Decor',
-        imageUrl: 'https://images.unsplash.com/photo-1603905179139-db12ab535ca9?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1603905179139-db12ab535ca9?w=800',
       },
       {
         name: 'Ceramic Planter Set',
@@ -406,7 +592,8 @@ const sampleTenants: SeedTenant[] = [
         price: 28.5,
         stock: 48,
         category: 'Decor',
-        imageUrl: 'https://images.unsplash.com/photo-1701270631258-ca1a2edbd9c5?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1701270631258-ca1a2edbd9c5?w=800',
       },
       {
         name: 'Oak Table',
@@ -415,7 +602,8 @@ const sampleTenants: SeedTenant[] = [
         price: 129.0,
         stock: 18,
         category: 'Furniture',
-        imageUrl: 'https://images.unsplash.com/photo-1557784415-3bdc60b1c02b?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1557784415-3bdc60b1c02b?w=800',
       },
       {
         name: 'Bookshelf Ladder 5-Tier',
@@ -424,7 +612,8 @@ const sampleTenants: SeedTenant[] = [
         price: 179.0,
         stock: 14,
         category: 'Furniture',
-        imageUrl: 'https://images.unsplash.com/photo-1535905557558-afc4877a26fc?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1535905557558-afc4877a26fc?w=800',
       },
     ],
   },
@@ -439,8 +628,7 @@ const sampleTenants: SeedTenant[] = [
     secondaryColor: '#b45309',
     logoUrl:
       'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=200&h=200&fit=crop',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200',
+    bannerUrl: TENANT_BANNER_BY_SLUG['sports-world'],
     categories: ['Running', 'Training', 'Outdoor'],
     products: [
       {
@@ -510,7 +698,8 @@ const sampleTenants: SeedTenant[] = [
         price: 179.99,
         stock: 32,
         category: 'Running',
-        imageUrl: 'https://images.unsplash.com/photo-1547941126-3d5322b218b0?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1547941126-3d5322b218b0?w=800',
       },
       {
         name: 'Recovery Slide Sandals',
@@ -519,7 +708,8 @@ const sampleTenants: SeedTenant[] = [
         price: 39.99,
         stock: 60,
         category: 'Running',
-        imageUrl: 'https://images.unsplash.com/photo-1633281651728-b7f0bd1f3eaa?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1633281651728-b7f0bd1f3eaa?w=800',
       },
       {
         name: 'Resistance Band Set',
@@ -528,7 +718,8 @@ const sampleTenants: SeedTenant[] = [
         price: 24.99,
         stock: 90,
         category: 'Training',
-        imageUrl: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800',
       },
       {
         name: 'Foam Roller Pro',
@@ -537,7 +728,8 @@ const sampleTenants: SeedTenant[] = [
         price: 29.99,
         stock: 55,
         category: 'Training',
-        imageUrl: 'https://images.unsplash.com/photo-1591741535585-9c4f52b3f13f?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1591741535585-9c4f52b3f13f?w=800',
       },
       {
         name: 'Camping Headlamp',
@@ -546,7 +738,8 @@ const sampleTenants: SeedTenant[] = [
         price: 34.0,
         stock: 48,
         category: 'Outdoor',
-        imageUrl: 'https://images.unsplash.com/photo-1630275383125-2ecfa5f431d5?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1630275383125-2ecfa5f431d5?w=800',
       },
       {
         name: 'Trekking Poles (Pair)',
@@ -555,7 +748,8 @@ const sampleTenants: SeedTenant[] = [
         price: 49.99,
         stock: 36,
         category: 'Outdoor',
-        imageUrl: 'https://images.unsplash.com/photo-1776006534692-2c35e298732a?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1776006534692-2c35e298732a?w=800',
       },
     ],
   },
@@ -570,8 +764,7 @@ const sampleTenants: SeedTenant[] = [
     secondaryColor: '#78350f',
     logoUrl:
       'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200',
+    bannerUrl: TENANT_BANNER_BY_SLUG['gourmet-pantry'],
     categories: ['Pantry', 'Beverages', 'Gifts'],
     products: [
       {
@@ -627,7 +820,7 @@ const sampleTenants: SeedTenant[] = [
       {
         name: 'Gourmet Spice Collection',
         description:
-          'Six small-batch blends in glass jars — includes za\'atar, vadouvan, and smoked paprika with recipe cards.',
+          "Six small-batch blends in glass jars — includes za'atar, vadouvan, and smoked paprika with recipe cards.",
         price: 42.0,
         stock: 35,
         category: 'Gifts',
@@ -641,7 +834,8 @@ const sampleTenants: SeedTenant[] = [
         price: 22.0,
         stock: 40,
         category: 'Pantry',
-        imageUrl: 'https://images.unsplash.com/photo-1654515722385-c684c5331c04?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1654515722385-c684c5331c04?w=800',
       },
       {
         name: 'Sourdough Bread Mix',
@@ -650,7 +844,8 @@ const sampleTenants: SeedTenant[] = [
         price: 12.5,
         stock: 75,
         category: 'Pantry',
-        imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800',
       },
       {
         name: 'Sparkling Elderflower',
@@ -659,7 +854,8 @@ const sampleTenants: SeedTenant[] = [
         price: 8.99,
         stock: 100,
         category: 'Beverages',
-        imageUrl: 'https://images.unsplash.com/photo-1588184069951-e8a1c47be70f?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1588184069951-e8a1c47be70f?w=800',
       },
       {
         name: 'Cold Brew Concentrate',
@@ -668,7 +864,8 @@ const sampleTenants: SeedTenant[] = [
         price: 14.99,
         stock: 55,
         category: 'Beverages',
-        imageUrl: 'https://images.unsplash.com/photo-1591260201798-e714889b17f3?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1591260201798-e714889b17f3?w=800',
       },
       {
         name: 'Gourmet Nut Gift Tin',
@@ -677,7 +874,8 @@ const sampleTenants: SeedTenant[] = [
         price: 29.99,
         stock: 42,
         category: 'Gifts',
-        imageUrl: 'https://images.unsplash.com/photo-1769255484646-16988ad5552d?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1769255484646-16988ad5552d?w=800',
       },
       {
         name: 'Artisan Jam Trio',
@@ -686,7 +884,8 @@ const sampleTenants: SeedTenant[] = [
         price: 26.0,
         stock: 38,
         category: 'Gifts',
-        imageUrl: 'https://images.unsplash.com/photo-1618680705029-96d0af7e24ca?w=800',
+        imageUrl:
+          'https://images.unsplash.com/photo-1618680705029-96d0af7e24ca?w=800',
       },
     ],
   },
@@ -699,21 +898,313 @@ function validateTenantProducts(tenant: SeedTenant) {
   }
   for (const category of tenant.categories) {
     const count = counts.get(category) ?? 0;
-    if (count < 2) {
+    if (count < MIN_PRODUCTS_PER_CATEGORY) {
       throw new Error(
-        `Tenant "${tenant.slug}" category "${category}" has ${count} product(s); need at least 2.`,
+        `Tenant "${tenant.slug}" category "${category}" has ${count} product(s); need at least ${MIN_PRODUCTS_PER_CATEGORY}.`,
       );
     }
   }
 }
 
+function getActiveTenants(): SeedTenant[] {
+  return sampleTenants
+    .filter(
+      (t) =>
+        !EXCLUDED_TENANT_NAMES.has(t.name) &&
+        !EXCLUDED_TENANT_SLUGS.has(t.slug),
+    )
+    .map(densifyTenantCatalog);
+}
+
+type SeededUser = { id: number; email: string; role: UserRole };
+type SeededProduct = { id: number; name: string; price: Prisma.Decimal };
+
+const REVIEW_SNIPPETS = [
+  'Exactly what I needed — fits well and arrived faster than expected.',
+  'Great quality for the price. Would buy again from this store.',
+  'Solid build and thoughtful packaging. Very happy with this purchase.',
+  'Good value overall. A couple of minor quirks but nothing deal-breaking.',
+  'Impressed with the finish and feel. Matches the photos closely.',
+  'Perfect gift — recipient loved it. Five stars from our household.',
+  'Reliable everyday pick. Customer support was helpful when I had a question.',
+  'Nice design and practical details. Shipping was smooth and tracked.',
+];
+
+async function upsertProductWithGallery(
+  tenantId: number,
+  tenantSlug: string,
+  storeName: string,
+  categoryId: number,
+  product: SeedProduct,
+): Promise<SeededProduct> {
+  const description = enrichProductDescription(
+    product.name,
+    product.description,
+    storeName,
+  );
+  const gallery = buildProductImageGallery(
+    tenantSlug,
+    product.name,
+    product.imageUrl,
+  );
+  const primaryUrl = gallery.find((img) => img.isPrimary)?.url ?? gallery[0].url;
+
+  const existing = await prisma.product.findFirst({
+    where: { tenantId, name: product.name },
+  });
+
+  if (existing) {
+    await prisma.product.update({
+      where: { id: existing.id },
+      data: {
+        description,
+        price: product.price,
+        stock: product.stock,
+        categoryId,
+        imageUrl: primaryUrl,
+      },
+    });
+    await prisma.productImage.deleteMany({ where: { productId: existing.id } });
+    await prisma.productImage.createMany({
+      data: gallery.map((img) => ({
+        productId: existing.id,
+        url: img.url,
+        publicId: '',
+        isPrimary: img.isPrimary,
+      })),
+    });
+    const updated = await prisma.product.findUniqueOrThrow({
+      where: { id: existing.id },
+    });
+    return { id: updated.id, name: updated.name, price: updated.price };
+  }
+
+  const created = await prisma.product.create({
+    data: {
+      name: product.name,
+      description,
+      price: product.price,
+      stock: product.stock,
+      categoryId,
+      tenantId,
+      imageUrl: primaryUrl,
+      images: {
+        create: gallery.map((img) => ({
+          url: img.url,
+          publicId: '',
+          isPrimary: img.isPrimary,
+        })),
+      },
+    },
+  });
+  return { id: created.id, name: created.name, price: created.price };
+}
+
+async function seedTenantUsers(
+  tenantId: number,
+  tenantSlug: string,
+  hashedPassword: string,
+): Promise<SeededUser[]> {
+  const users: SeededUser[] = [];
+
+  const customerEmails = [
+    `customer@${tenantSlug}.local`,
+    ...Array.from(
+      { length: EXTRA_CUSTOMERS_PER_TENANT },
+      (_, i) => `shopper${i + 2}@${tenantSlug}.local`,
+    ),
+  ];
+
+  for (const [index, email] of customerEmails.entries()) {
+    const user = await prisma.user.upsert({
+      where: { tenantId_email: { tenantId, email } },
+      update: {
+        name: index === 0 ? 'Demo Customer' : `Shopper ${index + 1}`,
+        password: hashedPassword,
+        role: UserRole.CUSTOMER,
+      },
+      create: {
+        email,
+        name: index === 0 ? 'Demo Customer' : `Shopper ${index + 1}`,
+        password: hashedPassword,
+        tenantId,
+        role: UserRole.CUSTOMER,
+      },
+    });
+    users.push({ id: user.id, email: user.email, role: user.role });
+  }
+
+  const existingAdmin = await prisma.user.findFirst({
+    where: { tenantId, role: UserRole.ADMIN },
+  });
+
+  if (existingAdmin) {
+    const admin = await prisma.user.update({
+      where: { id: existingAdmin.id },
+      data: {
+        email: ADMIN_LOGIN,
+        name: 'Store Admin',
+        password: hashedPassword,
+        role: UserRole.ADMIN,
+      },
+    });
+    users.push({ id: admin.id, email: admin.email, role: admin.role });
+  } else {
+    const admin = await prisma.user.create({
+      data: {
+        email: ADMIN_LOGIN,
+        name: 'Store Admin',
+        password: hashedPassword,
+        tenantId,
+        role: UserRole.ADMIN,
+      },
+    });
+    users.push({ id: admin.id, email: admin.email, role: admin.role });
+  }
+
+  return users;
+}
+
+async function seedOrdersForUsers(
+  tenantId: number,
+  users: SeededUser[],
+  products: SeededProduct[],
+) {
+  if (products.length === 0) return;
+
+  for (const user of users) {
+    const existingOrder = await prisma.order.findFirst({
+      where: { tenantId, userId: user.id },
+    });
+    if (existingOrder) continue;
+
+    const productA = products[user.id % products.length];
+    const productB = products[(user.id + 3) % products.length];
+    const lineItems =
+      productA.id === productB.id
+        ? [{ product: productA, quantity: 1 }]
+        : [
+            { product: productA, quantity: 1 },
+            { product: productB, quantity: 2 },
+          ];
+
+    const total = lineItems.reduce(
+      (sum, line) => sum.add(line.product.price.mul(line.quantity)),
+      new Prisma.Decimal(0),
+    );
+
+    await prisma.order.create({
+      data: {
+        userId: user.id,
+        tenantId,
+        status: OrderStatus.CONFIRMED,
+        totalAmount: total,
+        items: {
+          create: lineItems.map((line) => ({
+            productId: line.product.id,
+            quantity: line.quantity,
+            price: line.product.price,
+          })),
+        },
+        payments: {
+          create: {
+            method: PaymentMethod.CREDIT_CARD,
+            status: PaymentStatus.COMPLETED,
+            amount: total,
+          },
+        },
+        shipping: {
+          create: {
+            carrier: 'Standard Delivery',
+            status: ShippingStatus.PENDING,
+          },
+        },
+      },
+    });
+  }
+}
+
+async function seedReviewsForProducts(
+  tenantId: number,
+  users: SeededUser[],
+  products: SeededProduct[],
+) {
+  const reviewers = users.filter((u) => u.role === UserRole.CUSTOMER);
+  if (reviewers.length === 0) return;
+
+  for (const product of products) {
+    const reviewCount =
+      REVIEWS_PER_PRODUCT_MIN +
+      (hashString(`${product.id}:${product.name}`) %
+        (REVIEWS_PER_PRODUCT_MAX - REVIEWS_PER_PRODUCT_MIN + 1));
+
+    for (let r = 0; r < reviewCount; r++) {
+      const author = reviewers[(product.id + r) % reviewers.length];
+      const rating = 3 + ((product.id + r) % 3);
+      const comment =
+        REVIEW_SNIPPETS[(product.id + r) % REVIEW_SNIPPETS.length];
+
+      await prisma.review.upsert({
+        where: {
+          userId_productId: {
+            userId: author.id,
+            productId: product.id,
+          },
+        },
+        update: { rating, comment, tenantId },
+        create: {
+          userId: author.id,
+          productId: product.id,
+          tenantId,
+          rating,
+          comment,
+        },
+      });
+    }
+  }
+}
+
+async function purgeDeletedTenants() {
+  const result = await prisma.tenant.deleteMany({
+    where: {
+      OR: [
+        { slug: { in: [...DELETED_TENANT_SLUGS] } },
+        { name: { in: [...DELETED_TENANT_NAMES] } },
+      ],
+    },
+  });
+  if (result.count > 0) {
+    console.log(`Deleted ${result.count} legacy tenant(s) (University A)`);
+  }
+}
+
+async function deactivateExcludedTenants() {
+  for (const slug of EXCLUDED_TENANT_SLUGS) {
+    await prisma.tenant.updateMany({
+      where: { slug },
+      data: { isActive: false },
+    });
+  }
+}
+
 async function main() {
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
-  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, BCRYPT_ROUNDS);
+  const hashedPassword = await bcrypt.hash(
+    SEED_PASSWORD_PLAINTEXT,
+    BCRYPT_ROUNDS,
+  );
+  const activeTenants = getActiveTenants();
+
+  await purgeDeletedTenants();
+  await deactivateExcludedTenants();
 
   console.log('\n--- Seeding database (5 shops) ---\n');
+  if (EXCLUDED_TENANT_NAMES.size > 0) {
+    console.log(
+      `Skipping excluded tenants: ${[...EXCLUDED_TENANT_NAMES].join(', ')}`,
+    );
+  }
 
-  for (const tenantData of sampleTenants) {
+  for (const tenantData of activeTenants) {
     validateTenantProducts(tenantData);
 
     const tenant = await prisma.tenant.upsert({
@@ -755,123 +1246,48 @@ async function main() {
       categoryMap.set(categoryName, category.id);
     }
 
+    const seededProducts: SeededProduct[] = [];
     for (const product of tenantData.products) {
       const categoryId = categoryMap.get(product.category);
       if (!categoryId) continue;
 
-      const imageKey = product.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-      const imageUrl =
-        product.imageUrl.includes('picsum.photos') ||
-          product.imageUrl.includes('unsplash.com')
-          ? product.imageUrl
-          : productImage(tenantData.slug, imageKey);
-
-      const existing = await prisma.product.findFirst({
-        where: { tenantId: tenant.id, name: product.name },
-      });
-
-      if (existing) {
-        await prisma.product.update({
-          where: { id: existing.id },
-          data: {
-            description: product.description,
-            price: product.price,
-            stock: product.stock,
-            categoryId,
-            imageUrl,
-          },
-        });
-        await prisma.productImage.deleteMany({
-          where: { productId: existing.id },
-        });
-        await prisma.productImage.create({
-          data: {
-            productId: existing.id,
-            url: imageUrl,
-            publicId: '',
-            isPrimary: true,
-          },
-        });
-      } else {
-        await prisma.product.create({
-          data: {
-            name: product.name,
-            description: product.description,
-            price: product.price,
-            stock: product.stock,
-            categoryId,
-            tenantId: tenant.id,
-            imageUrl,
-            images: {
-              create: { url: imageUrl, publicId: '', isPrimary: true },
-            },
-          },
-        });
-      }
+      const seeded = await upsertProductWithGallery(
+        tenant.id,
+        tenantData.slug,
+        tenantData.storeName,
+        categoryId,
+        product,
+      );
+      seededProducts.push(seeded);
     }
 
-    const customerEmail = `customer@${tenantData.slug}.local`;
-    await prisma.user.upsert({
-      where: {
-        tenantId_email: { tenantId: tenant.id, email: customerEmail },
-      },
-      update: {
-        name: 'Demo Customer',
-        password: passwordHash,
-        role: UserRole.CUSTOMER,
-      },
-      create: {
-        email: customerEmail,
-        name: 'Demo Customer',
-        password: passwordHash,
-        tenantId: tenant.id,
-        role: UserRole.CUSTOMER,
-      },
-    });
-
-    const existingAdmin = await prisma.user.findFirst({
-      where: { tenantId: tenant.id, role: UserRole.ADMIN },
-    });
-
-    if (existingAdmin) {
-      await prisma.user.update({
-        where: { id: existingAdmin.id },
-        data: {
-          email: ADMIN_LOGIN,
-          name: 'Store Admin',
-          password: adminPasswordHash,
-          role: UserRole.ADMIN,
-        },
-      });
-    } else {
-      await prisma.user.create({
-        data: {
-          email: ADMIN_LOGIN,
-          name: 'Store Admin',
-          password: adminPasswordHash,
-          tenantId: tenant.id,
-          role: UserRole.ADMIN,
-        },
-      });
-    }
+    const users = await seedTenantUsers(
+      tenant.id,
+      tenantData.slug,
+      hashedPassword,
+    );
+    await seedOrdersForUsers(tenant.id, users, seededProducts);
+    await seedReviewsForProducts(tenant.id, users, seededProducts);
 
     const productCount = tenantData.products.length;
+    const customerCount = users.filter((u) => u.role === UserRole.CUSTOMER).length;
     console.log(`✓ ${tenantData.storeName} (${tenantData.slug})`);
     console.log(
-      `    ${tenantData.categories.length} categories, ${productCount} products`,
+      `    ${tenantData.categories.length} categories, ${productCount} products, ${customerCount} customers`,
     );
-    console.log(`    Theme: ${tenantData.primaryColor} / ${tenantData.secondaryColor}`);
-    console.log(`    Customer: ${customerEmail} / ${DEMO_PASSWORD}`);
-    console.log(`    Admin:    ${ADMIN_LOGIN} / ${ADMIN_PASSWORD}`);
+    console.log(
+      `    Theme: ${tenantData.primaryColor} / ${tenantData.secondaryColor}`,
+    );
+    console.log(
+      `    Login: any seeded user / password "${SEED_PASSWORD_PLAINTEXT}"`,
+    );
+    console.log(`    Admin email: ${ADMIN_LOGIN}`);
   }
 
   console.log('\n--- Seed complete: 5 shops ready ---\n');
 }
 
-for (const tenant of sampleTenants) {
+for (const tenant of getActiveTenants()) {
   validateTenantProducts(tenant);
 }
 
